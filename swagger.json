@@ -101,6 +101,28 @@
           "500": { "description": "Internal error" }
         }
       }
+    },
+    "/api/ai/logs": {
+      "get": {
+        "summary": "AI Observability Logs",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } },
+          { "name": "intent", "in": "query", "schema": { "type": "string" } },
+          { "name": "injection", "in": "query", "schema": { "type": "boolean" } }
+        ],
+        "responses": {
+          "200": { "description": "AI logs" }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Health Check",
+        "responses": {
+          "200": { "description": "Service healthy" },
+          "503": { "description": "Service degraded" }
+        }
+      }
     }
   }
 }

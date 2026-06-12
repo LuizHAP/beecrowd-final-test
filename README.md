@@ -4,13 +4,13 @@
 
 ### Architecture Overview
 
-This is a monolithic Next.js application (App Router) with a PostgreSQL database, containerized via Docker Compose. The system manages orders with a strict state machine and provides an AI-powered support agent with RAG and tool calling.
+This is a NestJS backend application with a PostgreSQL database, containerized via Docker Compose. The system manages orders with a strict state machine and provides an AI-powered support agent with RAG and tool calling.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                     Docker Compose                       │
 │  ┌──────────────────┐    ┌──────────────────────────┐   │
-│  │  Next.js Server  │    │     PostgreSQL DB        │   │
+│  │  NestJS Server   │    │     PostgreSQL DB        │   │
 │  │                  │    │                          │   │
 │  │  /api/orders     │◄──►│  Order / OrderItem       │   │
 │  │  /api/ai/chat    │    │  AILog                   │   │
@@ -78,7 +78,7 @@ The background job that transitions PENDING → PROCESSING uses `SELECT ... FOR 
 
 ```bash
 docker compose up -d  # Starts PostgreSQL
-npm run dev           # Starts Next.js
+npm run start:dev     # Starts NestJS in watch mode
 ```
 
 ---
@@ -98,7 +98,7 @@ The AI support agent (`/api/ai/chat`) implements:
 
 ### Tools Used
 
-- **Vercel AI SDK** — AI orchestration layer
+- **NestJS** — Backend framework
 - **Prisma ORM** — Database access with type safety
 - **Docker Compose** — Containerized PostgreSQL
 
@@ -123,10 +123,7 @@ All AI decisions that affect business state (cancellations, status changes) are 
 
 | Component | Tests | Coverage |
 |-----------|-------|----------|
-| AI Agent | 18 | Prompt injection, intent extraction, RAG context |
-| Order API | 12 | Create, list, detail, cancel, validation |
-| AI Chat API | 7 | Injection, cancel, status, help, logging |
-| AI Logs API | 4 | Filtering, pagination |
-| Health Check | 2 | Connected, disconnected |
+| Orders Service | 10 | Create, list, detail, cancel, validation |
 | Background Job | 4 | Success, empty, error, SKIP LOCKED |
-| **Total** | **49** | **All passing** |
+| AI Agent | 7 | Injection, cancel, status, help, logging |
+| **Total** | **21** | **All passing** |
