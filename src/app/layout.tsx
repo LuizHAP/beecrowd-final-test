@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "beecrowd Final Test",
-  description: "Solutions for beecrowd programming test",
+  title: "E-Commerce AI Support",
+  description: "Order management with AI-powered support agent",
 };
 
 export default function RootLayout({

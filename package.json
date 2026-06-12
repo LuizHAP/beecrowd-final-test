@@ -1,20 +1,20 @@
 {
-  "name": "beecrowd-final-test",
-  "version": "0.1.0",
+  "name": "ecommerce-ai-support",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "db:init": "npx prisma migrate dev --name init",
-    "db:generate": "npx prisma generate",
-    "db:studio": "npx prisma studio",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev --name init",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"
   },
   "dependencies": {
-    "@ai-sdk/react": "^1.0.0",
     "@prisma/client": "^6.13.0",
     "ai": "^4.3.0",
     "next": "^16.0.0",
@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
-    "@types/node": "^20.19.43",
+    "@types/node": "^20.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^8.0.0",
@@ -32,6 +32,6 @@
     "prisma": "^6.13.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.0.0",
-    "vitest": "^4.1.8"
+    "vitest": "^3.0.0"
   }
 }

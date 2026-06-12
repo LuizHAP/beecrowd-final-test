@@ -3,12 +3,12 @@ version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: beecrowd-db
+    container_name: ecommerce-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: beecrowd
-      POSTGRES_PASSWORD: beecrowd123
-      POSTGRES_DB: beecrowd_test
+      POSTGRES_USER: ecommerce
+      POSTGRES_PASSWORD: ecommerce123
+      POSTGRES_DB: ecommerce
     ports:
       - "5432:5432"
     volumes:
