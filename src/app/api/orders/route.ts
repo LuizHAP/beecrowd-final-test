@@ -24,6 +24,9 @@ export async function POST(request: Request) {
       }
     }
 
+    // Calculate total price
+    const total = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+
     const order = await prisma.order.create({
       data: {
         status: 'PENDING',
@@ -38,7 +41,7 @@ export async function POST(request: Request) {
       include: { items: true },
     });
 
-    return NextResponse.json(order, { status: 201 });
+    return NextResponse.json({ ...order, total }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal error' },
@@ -64,7 +67,13 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json(orders);
+    // Calculate total for each order
+    const ordersWithTotal = orders.map((order) => ({
+      ...order,
+      total: order.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
+    }));
+
+    return NextResponse.json(ordersWithTotal);
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal error' },

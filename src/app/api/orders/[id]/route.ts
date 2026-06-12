@@ -18,7 +18,9 @@ export async function GET(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    return NextResponse.json(order);
+    const total = order.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+
+    return NextResponse.json({ ...order, total });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal error' },

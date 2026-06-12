@@ -16,12 +16,15 @@ describe('GET /api/orders/:id', () => {
     vi.clearAllMocks();
   });
 
-  it('returns order details', async () => {
+  it('returns order details with total', async () => {
     const { GET } = await import('./route');
     vi.mocked(prisma.order.findUnique).mockResolvedValue({
       id: 'test-id',
       status: 'PENDING' as const,
-      items: [{ id: 'item-1', productId: 'prod-1', quantity: 2, unitPrice: 10 }],
+      items: [
+        { id: 'item-1', productId: 'prod-1', quantity: 2, unitPrice: 10 },
+        { id: 'item-2', productId: 'prod-2', quantity: 3, unitPrice: 5 },
+      ],
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -34,6 +37,7 @@ describe('GET /api/orders/:id', () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.id).toBe('test-id');
+    expect(data.total).toBe(35); // 2*10 + 3*5 = 35
   });
 
   it('returns 404 for non-existent order', async () => {
