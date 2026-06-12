@@ -12,7 +12,6 @@ export async function transitionPendingToProcessing(): Promise<{
   error?: string;
 }> {
   try {
-    // Atomic: lock only PENDING rows, skip already-locked ones
     const result = await prisma.$executeRawUnsafe(`
       UPDATE "Order"
       SET status = 'PROCESSING', "updatedAt" = NOW()
@@ -26,9 +25,12 @@ export async function transitionPendingToProcessing(): Promise<{
       RETURNING id
     `);
 
+    console.log(`[BACKGROUND JOB] Transited ${result} orders to PROCESSING`);
     return { updated: result };
   } catch (error) {
-    return { updated: 0, error: error instanceof Error ? error.message : 'Unknown error' };
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[BACKGROUND JOB] Error:', errorMsg);
+    return { updated: 0, error: errorMsg };
   }
 }
 

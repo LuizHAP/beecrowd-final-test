@@ -8,6 +8,9 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: vi.fn(),
       delete: vi.fn(),
     },
+    aILog: {
+      create: vi.fn(),
+    },
   },
 }));
 
@@ -130,10 +133,8 @@ describe('POST /api/ai/chat', () => {
     expect(data.response).toContain('Order Cancellations');
   });
 
-  it('logs AI transaction metadata', async () => {
+  it('persists AI log to database', async () => {
     const { POST } = await import('./route');
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
     const res = await POST(new Request('http://localhost:3000/api/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -141,7 +142,6 @@ describe('POST /api/ai/chat', () => {
     }));
 
     expect(res.status).toBe(200);
-    expect(consoleSpy).toHaveBeenCalledWith('[AI LOG]', expect.any(String));
-    consoleSpy.mockRestore();
+    expect(prisma.aILog.create).toHaveBeenCalled();
   });
 });

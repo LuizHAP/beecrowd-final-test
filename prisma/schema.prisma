@@ -18,6 +18,7 @@ model Order {
   id        String       @id @default(uuid())
   status    OrderStatus  @default(PENDING)
   items     OrderItem[]
+  aiLogs    AILog[]
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 }
@@ -29,4 +30,31 @@ model OrderItem {
   productId String
   quantity  Int
   unitPrice Float
+}
+
+enum AILogIntent {
+  CANCEL_ORDER
+  CHECK_STATUS
+  GENERAL_HELP
+  CREATE_ORDER
+}
+
+enum AILogTool {
+  CANCEL_ORDER
+}
+
+model AILog {
+  id                       String          @id @default(uuid())
+  orderId                  String?
+  order                    Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  intent                   AILogIntent
+  model                    String
+  tokensUsed               Int
+  responseTimeMs           Int
+  toolCalled               AILogTool?
+  toolSuccess              Boolean?
+  promptInjectionDetected  Boolean         @default(false)
+  rawInput                 String?
+  rawOutput                String?
+  timestamp                DateTime        @default(now())
 }

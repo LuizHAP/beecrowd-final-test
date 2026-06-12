@@ -49,45 +49,45 @@ describe('detectPromptInjection', () => {
 });
 
 describe('extractIntent', () => {
-  it('extracts cancel_order intent', () => {
-    expect(extractIntent('I want to cancel my order')).toBe('cancel_order');
-    expect(extractIntent('Please refund my purchase')).toBe('cancel_order');
-    expect(extractIntent('Stop my order')).toBe('cancel_order');
+  it('extracts CANCEL_ORDER intent', () => {
+    expect(extractIntent('I want to cancel my order')).toBe('CANCEL_ORDER');
+    expect(extractIntent('Please refund my purchase')).toBe('CANCEL_ORDER');
+    expect(extractIntent('Stop my order')).toBe('CANCEL_ORDER');
   });
 
-  it('extracts check_status intent', () => {
-    expect(extractIntent('What is the status of my order?')).toBe('check_status');
-    expect(extractIntent('Where is my package?')).toBe('check_status');
-    expect(extractIntent('Track my order')).toBe('check_status');
+  it('extracts CHECK_STATUS intent', () => {
+    expect(extractIntent('What is the status of my order?')).toBe('CHECK_STATUS');
+    expect(extractIntent('Where is my package?')).toBe('CHECK_STATUS');
+    expect(extractIntent('Track my order')).toBe('CHECK_STATUS');
   });
 
-  it('extracts general_help intent', () => {
-    expect(extractIntent('Can you help me?')).toBe('general_help');
-    expect(extractIntent('I have a question')).toBe('general_help');
-    expect(extractIntent('What can you do?')).toBe('general_help');
+  it('extracts GENERAL_HELP intent', () => {
+    expect(extractIntent('Can you help me?')).toBe('GENERAL_HELP');
+    expect(extractIntent('I have a question')).toBe('GENERAL_HELP');
+    expect(extractIntent('What can you do?')).toBe('GENERAL_HELP');
   });
 
-  it('extracts create_order intent', () => {
-    expect(extractIntent('I want to create an order')).toBe('create_order');
-    expect(extractIntent('Buy a new product')).toBe('create_order');
+  it('extracts CREATE_ORDER intent', () => {
+    expect(extractIntent('I want to create an order')).toBe('CREATE_ORDER');
+    expect(extractIntent('Buy a new product')).toBe('CREATE_ORDER');
   });
 });
 
 describe('buildRAGContext', () => {
-  it('returns cancellation rules for cancel intent', () => {
-    const context = buildRAGContext('cancel_order');
+  it('returns cancellation rules for CANCEL_ORDER intent', () => {
+    const context = buildRAGContext('CANCEL_ORDER');
     expect(context).toContain('Order Cancellations');
     expect(context).toContain('PENDING');
   });
 
-  it('returns update window rules for status intent', () => {
-    const context = buildRAGContext('check_status');
+  it('returns update window rules for CHECK_STATUS intent', () => {
+    const context = buildRAGContext('CHECK_STATUS');
     expect(context).toContain('Update Window');
     expect(context).toContain('PENDING');
   });
 
-  it('returns all rules for general help', () => {
-    const context = buildRAGContext('general_help');
+  it('returns all rules for GENERAL_HELP', () => {
+    const context = buildRAGContext('GENERAL_HELP');
     expect(context).toContain('Order Cancellations');
     expect(context).toContain('Update Window');
   });

@@ -21,13 +21,14 @@ export interface Order {
   updatedAt: string;
 }
 
-export interface AILog {
-  intent: string;
+export interface AILogEntry {
+  intent: 'CANCEL_ORDER' | 'CHECK_STATUS' | 'GENERAL_HELP' | 'CREATE_ORDER';
   model: string;
   tokensUsed: number;
   responseTimeMs: number;
-  toolCalled: string | null;
+  toolCalled: 'CANCEL_ORDER' | null;
   toolSuccess: boolean | null;
   promptInjectionDetected: boolean;
-  timestamp: string;
+  rawInput?: string;
+  rawOutput?: string;
 }

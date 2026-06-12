@@ -16,6 +16,8 @@ export default function Home() {
         <li><code>GET /api/orders/:id</code> — Get order details</li>
         <li><code>DELETE /api/orders/:id</code> — Cancel order</li>
         <li><code>POST /api/ai/chat</code> — AI support agent</li>
+        <li><code>GET /api/ai/logs</code> — AI observability logs</li>
+        <li><code>GET /api/health</code> — Health check</li>
       </ul>
     </main>
   );
