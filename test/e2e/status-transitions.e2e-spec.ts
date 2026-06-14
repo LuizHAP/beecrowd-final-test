@@ -1,5 +1,8 @@
 import request from 'supertest';
 import { app } from '../support/e2e-app';
+import { BackgroundJobModule } from '../../src/background-job/background-job.module';
+import { BackgroundJobService } from '../../src/background-job/background-job.service';
+import { Test, TestingModule } from '@nestjs/testing';
 
 const API = `/api/orders`;
 
@@ -62,5 +65,27 @@ describe('E2E: Order Status Transitions', () => {
       .delete(`${API}/${createRes.body.id}`);
     expect(res.status).toBe(400);
     expect(res.body.message).toContain('cannot be cancelled');
+  });
+
+  it('should transition PENDING → PROCESSING when background job runs', async () => {
+    // Create a PENDING order
+    const createRes = await request(app.getHttpServer())
+      .post(API)
+      .send({ items: [{ productId: 'p1', quantity: 1, unitPrice: 10 }] });
+
+    expect(createRes.body.status).toBe('PENDING');
+
+    // Manually trigger the background job
+    const module: TestingModule = await Test.createTestingModule({
+      imports: [BackgroundJobModule],
+    }).compile();
+
+    const bgJobService = module.get(BackgroundJobService);
+    await bgJobService.transitionPendingToProcessing();
+
+    // Verify order status changed to PROCESSING
+    const getRes = await request(app.getHttpServer())
+      .get(`${API}/${createRes.body.id}`);
+    expect(getRes.body.status).toBe('PROCESSING');
   });
 });

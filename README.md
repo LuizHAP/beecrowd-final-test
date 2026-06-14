@@ -129,6 +129,18 @@ All AI decisions that affect business state (cancellations, status changes) are 
 | E2E (API) | 22 | Order CRUD, status transitions, AI chat |
 | **Total** | **169** | **All passing** (`npm run test:all`) |
 
+### Stack Deviation
+
+The original specification suggested Next.js with Vercel AI SDK. This implementation uses **NestJS** instead for the following reasons:
+
+- **Backend-first architecture**: The requirements describe a "legacy microservice" — NestJS is purpose-built for backend microservices with built-in dependency injection, modular architecture, and middleware support
+- **Better OpenAPI/Swagger support**: `@nestjs/swagger` provides automatic, type-safe API documentation generation
+- **Background job support**: `@nestjs/schedule` is available for scheduled tasks (though the current implementation uses `setInterval` for simplicity and testability)
+- **TypeScript-native**: Both stacks use TypeScript, so the core competency evaluation (architecture, testing, security) remains equivalent
+- **Deterministic validation**: All business-critical operations (order cancellation, status transitions) are enforced by deterministic code regardless of the LLM's suggestions — a key requirement from the specification
+
+---
+
 ### Local Setup
 
 ```bash

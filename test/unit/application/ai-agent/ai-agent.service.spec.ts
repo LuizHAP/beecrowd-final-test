@@ -28,6 +28,16 @@ const mockPrisma = {
   },
 };
 
+const mockLLMService = {
+  isEnabled: jest.fn().mockReturnValue(false),
+  classifyIntent: jest.fn().mockResolvedValue({ intent: 'GENERAL_HELP', shouldCallTool: false, confidence: 0 }),
+  generateResponse: jest.fn().mockResolvedValue(''),
+};
+
+const mockOrdersService = {
+  create: jest.fn(),
+};
+
 jest.mock('@/common/prisma/prisma.service', () => ({
   PrismaService: jest.fn(() => mockPrisma),
 }));
@@ -37,7 +47,7 @@ describe('AiAgentService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new AiAgentService(mockOrderRepo as any, mockPrisma as any);
+    service = new AiAgentService(mockOrderRepo as any, mockPrisma as any, mockOrdersService as any, mockLLMService as any);
   });
 
   describe('process', () => {
@@ -177,9 +187,14 @@ describe('AiAgentService', () => {
       expect(log.toolSuccess).toBe(true);
     });
 
-    it('uses CREATE_ORDER rag context branch', async () => {
+    it('handles create order request without product details', async () => {
       const { response } = await service.process('I want to buy something new');
-      expect(response).toContain('Order Creation');
+      expect(response).toContain('Product ID');
+    });
+
+    it('detects create order intent from message', async () => {
+      const { log } = await service.process('I want to create a new order');
+      expect(log.intent).toBe('CREATE_ORDER');
     });
   });
 
@@ -330,7 +345,8 @@ describe('AiAgentService', () => {
     it('handles very long message', async () => {
       const longMessage = 'a'.repeat(10000);
       const { log } = await service.process(longMessage);
-      expect(log.tokensUsed).toBe(10000);
+      expect(log.promptInjectionDetected).toBe(false);
+      expect(log.intent).toBe('GENERAL_HELP');
     });
 
     it('handles special characters in message', async () => {
