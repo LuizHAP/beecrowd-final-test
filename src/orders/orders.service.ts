@@ -1,90 +1,75 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '../common/prisma/prisma.service';
+import { Order } from '../domain/order/order.entity';
+import { OrderItem } from '../domain/order/order-item.entity';
+import { OrderStatus } from '../domain/order/order-status';
+import { PrismaOrderRepository } from './prisma-order.repository';
 import { CreateOrderDto, ListOrdersDto, OrderResponseDto } from './dto';
 
 @Injectable()
 export class OrdersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly orderRepo: PrismaOrderRepository) {}
 
   async create(dto: CreateOrderDto): Promise<OrderResponseDto> {
     const { items } = dto;
 
-    for (const item of items) {
-      if (!item.productId || item.quantity <= 0 || item.unitPrice < 0) {
-        throw new ConflictException('Each item must have productId, quantity > 0, and unitPrice >= 0');
-      }
-    }
+    // Validate items using OrderItem constructor
+    const orderItems = items.map((item) => new OrderItem({
+      id: '',
+      productId: item.productId,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+    }));
 
-    const order = await this.prisma.order.create({
-      data: {
-        status: 'PENDING',
-        items: {
-          create: items.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-          })),
-        },
-      },
-      include: { items: true },
+    const order = new Order({
+      id: '',
+      status: OrderStatus.PENDING,
+      items: orderItems,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
 
-    return this.toResponseDto(order);
+    const created = await this.orderRepo.create(order);
+    return this.toResponseDto(created);
   }
 
   async findAll(dto: ListOrdersDto): Promise<OrderResponseDto[]> {
-    const where: Record<string, string> = {};
-    if (dto.status) {
-      where.status = dto.status;
-    }
-
-    const orders = await this.prisma.order.findMany({
-      where,
-      include: { items: true },
-      orderBy: { createdAt: 'desc' },
-    });
-
+    const orders = await this.orderRepo.findAll(dto.status);
     return orders.map((o) => this.toResponseDto(o));
   }
 
   async findOne(id: string): Promise<OrderResponseDto> {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      include: { items: true },
-    });
-
+    const order = await this.orderRepo.findById(id);
     if (!order) {
       throw new NotFoundException('Order not found');
     }
-
     return this.toResponseDto(order);
   }
 
   async cancel(id: string): Promise<{ message: string; order: OrderResponseDto }> {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-    });
-
+    const order = await this.orderRepo.findById(id);
     if (!order) {
       throw new NotFoundException('Order not found');
     }
 
-    if (order.status !== 'PENDING') {
-      throw new ConflictException(`Order cannot be cancelled. Current status: ${order.status}`);
-    }
+    order.cancel();
+    await this.orderRepo.updateStatus(id, OrderStatus.CANCELLED);
 
-    const cancelled = await this.prisma.order.delete({
-      where: { id },
-    });
-
-    return { message: 'Order cancelled', order: this.toResponseDto(cancelled) };
+    return { message: 'Order cancelled', order: this.toResponseDto(order) };
   }
 
-  private toResponseDto(order: any): OrderResponseDto {
-    const total = order.items.reduce((sum: number, item: any) => sum + item.unitPrice * item.quantity, 0);
+  private toResponseDto(order: Order): OrderResponseDto {
     return {
-      ...order,
-      total,
+      id: order.id,
+      status: order.status,
+      items: order.items.map((i) => ({
+        id: i.id,
+        productId: i.productId,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+      })),
+      total: order.total,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
     };
   }
 }

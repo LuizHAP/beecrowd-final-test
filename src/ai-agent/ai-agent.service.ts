@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { PrismaOrderRepository } from '../orders/prisma-order.repository';
+import { Order } from '../domain/order/order.entity';
+import { OrderStatus } from '../domain/order/order-status';
 import knowledgeBase from '../../knowledge_base.json';
 
 export interface AILogEntry {
@@ -16,7 +19,7 @@ export interface AILogEntry {
 
 @Injectable()
 export class AiAgentService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private orderRepo: PrismaOrderRepository, private prisma: PrismaService) {}
 
   async process(message: string, orderId?: string): Promise<{ response: string; log: AILogEntry }> {
     const startTime = Date.now();
@@ -150,13 +153,9 @@ export class AiAgentService {
     return relevantRules.map((kb) => `[${kb.context}] ${kb.rule}`).join('\n\n');
   }
 
-  private async getOrderContext(orderId: string) {
+  private async getOrderContext(orderId: string): Promise<Order | null> {
     try {
-      const order = await this.prisma.order.findUnique({
-        where: { id: orderId },
-        select: { id: true, status: true, items: true, createdAt: true },
-      });
-      return order || null;
+      return await this.orderRepo.findById(orderId);
     } catch {
       return null;
     }
@@ -164,12 +163,13 @@ export class AiAgentService {
 
   private async cancelOrder(orderId: string): Promise<{ success: boolean; message: string }> {
     try {
-      const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+      const order = await this.orderRepo.findById(orderId);
       if (!order) return { success: false, message: `Order ${orderId} not found.` };
-      if (order.status !== 'PENDING') {
+      if (!order.canCancel()) {
         return { success: false, message: `Order ${orderId} cannot be cancelled. Current status: ${order.status}.` };
       }
-      await this.prisma.order.delete({ where: { id: orderId } });
+      order.cancel();
+      await this.orderRepo.updateStatus(orderId, OrderStatus.CANCELLED);
       return { success: true, message: `Order ${orderId} has been successfully cancelled.` };
     } catch (error) {
       return { success: false, message: `Error cancelling order: ${error instanceof Error ? error.message : 'Unknown error'}` };
