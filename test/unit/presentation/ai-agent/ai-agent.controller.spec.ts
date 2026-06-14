@@ -1,5 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { AiAgentController } from './ai-agent.controller';
+import { AiAgentController } from '@/ai-agent/ai-agent.controller';
 
 describe('AiAgentController', () => {
   let controller: AiAgentController;
@@ -7,8 +6,8 @@ describe('AiAgentController', () => {
 
   beforeEach(() => {
     mockService = {
-      process: vi.fn(),
-      getLogs: vi.fn(),
+      process: jest.fn(),
+      getLogs: jest.fn(),
     };
     controller = new AiAgentController(mockService);
   });

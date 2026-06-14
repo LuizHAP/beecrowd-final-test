@@ -1,9 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ConflictException, NotFoundException } from '@nestjs/common';
-import { OrdersService } from './orders.service';
-import { Order } from '../domain/order/order.entity';
-import { OrderItem } from '../domain/order/order-item.entity';
-import { OrderStatus } from '../domain/order/order-status';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { OrdersService } from '@/orders/orders.service';
+import { Order } from '@/domain/order/order.entity';
+import { OrderItem } from '@/domain/order/order-item.entity';
+import { OrderStatus } from '@/domain/order/order-status';
 
 function makeOrder(overrides: Partial<Order> = {}): Order {
   return new Order({
@@ -32,10 +31,10 @@ describe('OrdersService', () => {
 
   beforeEach(() => {
     mockRepo = {
-      findById: vi.fn(),
-      findAll: vi.fn(),
-      create: vi.fn(),
-      updateStatus: vi.fn(),
+      findById: jest.fn(),
+      findAll: jest.fn(),
+      create: jest.fn(),
+      updateStatus: jest.fn(),
     };
     service = new OrdersService(mockRepo);
   });

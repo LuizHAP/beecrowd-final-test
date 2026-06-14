@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { validate } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
 import {
   CreateItemDto,
   CreateOrderDto,
   ListOrdersDto,
-} from './dto';
+} from '@/orders/dto';
 
 describe('CreateItemDto', () => {
   it('has expected properties', () => {
@@ -29,6 +30,16 @@ describe('CreateOrderDto', () => {
     expect(dto.items).toHaveLength(2);
     expect(dto.items[0].productId).toBe('prod-1');
     expect(dto.items[1].quantity).toBe(3);
+  });
+
+  it('validates nested items via class-transformer', async () => {
+    const dto = plainToInstance(CreateOrderDto, {
+      items: [{ productId: 'prod-1', quantity: 2, unitPrice: 15 }],
+    });
+
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+    expect(dto.items[0]).toBeInstanceOf(CreateItemDto);
   });
 });
 

@@ -1,10 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PrismaService } from './prisma.service';
+import { PrismaService } from '@/common/prisma/prisma.service';
 
-vi.mock('@prisma/client', () => ({
-  PrismaClient: vi.fn().mockImplementation(function () {
-    this.$connect = vi.fn().mockResolvedValue(undefined);
-    this.$disconnect = vi.fn().mockResolvedValue(undefined);
+jest.mock('@prisma/client', () => ({
+  PrismaClient: jest.fn().mockImplementation(function () {
+    this.$connect = jest.fn().mockResolvedValue(undefined);
+    this.$disconnect = jest.fn().mockResolvedValue(undefined);
   }),
 }));
 

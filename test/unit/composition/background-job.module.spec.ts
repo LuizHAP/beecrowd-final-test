@@ -1,5 +1,4 @@
-import { describe, it, expect } from 'vitest';
-import { BackgroundJobModule } from './background-job.module';
+import { BackgroundJobModule } from '@/background-job/background-job.module';
 
 describe('BackgroundJobModule', () => {
   it('is defined', () => {

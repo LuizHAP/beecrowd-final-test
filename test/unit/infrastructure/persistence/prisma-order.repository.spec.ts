@@ -1,8 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PrismaOrderRepository } from './prisma-order.repository';
-import { Order } from '../domain/order/order.entity';
-import { OrderItem } from '../domain/order/order-item.entity';
-import { OrderStatus } from '../domain/order/order-status';
+import { PrismaOrderRepository } from '@/orders/prisma-order.repository';
+import { Order } from '@/domain/order/order.entity';
+import { OrderItem } from '@/domain/order/order-item.entity';
+import { OrderStatus } from '@/domain/order/order-status';
 
 function makeOrder(overrides: Partial<Order> = {}): Order {
   return new Order({
@@ -22,10 +21,10 @@ describe('PrismaOrderRepository', () => {
   beforeEach(() => {
     mockPrisma = {
       order: {
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
+        findUnique: jest.fn(),
+        findMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
       },
     };
     repo = new PrismaOrderRepository(mockPrisma as any);

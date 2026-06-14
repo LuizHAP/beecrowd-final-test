@@ -1,5 +1,4 @@
-import { describe, it, expect } from 'vitest';
-import { AppModule } from './app.module';
+import { AppModule } from '@/app.module';
 
 describe('AppModule', () => {
   it('is defined', () => {

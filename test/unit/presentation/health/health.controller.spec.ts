@@ -1,5 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { HealthController } from './health.controller';
+import { HealthController } from '@/common/health/health.controller';
 
 describe('HealthController', () => {
   let controller: HealthController;
@@ -7,7 +6,7 @@ describe('HealthController', () => {
 
   beforeEach(() => {
     mockPrisma = {
-      $queryRaw: vi.fn(),
+      $queryRaw: jest.fn(),
     };
     controller = new HealthController(mockPrisma);
   });

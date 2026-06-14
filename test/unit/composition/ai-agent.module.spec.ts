@@ -1,5 +1,4 @@
-import { describe, it, expect } from 'vitest';
-import { AiAgentModule } from './ai-agent.module';
+import { AiAgentModule } from '@/ai-agent/ai-agent.module';
 
 describe('AiAgentModule', () => {
   it('is defined', () => {

@@ -1,25 +1,24 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BackgroundJobService } from './background-job.service';
+import { BackgroundJobService } from '@/background-job/background-job.service';
 
 const mockPrisma = {
-  $executeRawUnsafe: vi.fn(),
+  $executeRawUnsafe: jest.fn(),
 };
 
-vi.mock('../common/prisma/prisma.service', () => ({
-  PrismaService: vi.fn(() => mockPrisma),
+jest.mock('@/common/prisma/prisma.service', () => ({
+  PrismaService: jest.fn(() => mockPrisma),
 }));
 
 describe('BackgroundJobService', () => {
   let service: BackgroundJobService;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.useFakeTimers();
+    jest.clearAllMocks();
+    jest.useFakeTimers();
     service = new BackgroundJobService(mockPrisma as any);
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    jest.useRealTimers();
   });
 
   describe('transitionPendingToProcessing', () => {
@@ -51,24 +50,67 @@ describe('BackgroundJobService', () => {
     });
   });
 
+  describe('onModuleInit', () => {
+    it('starts the job outside test environment', async () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      const startSpy = jest.spyOn(service, 'start').mockImplementation(() => undefined);
+
+      await service.onModuleInit();
+
+      expect(startSpy).toHaveBeenCalled();
+      startSpy.mockRestore();
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    it('skips start in test environment', async () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'test';
+      const startSpy = jest.spyOn(service, 'start').mockImplementation(() => undefined);
+
+      await service.onModuleInit();
+
+      expect(startSpy).not.toHaveBeenCalled();
+      startSpy.mockRestore();
+      process.env.NODE_ENV = originalEnv;
+    });
+  });
+
   describe('start', () => {
+    it('runs transition on interval tick', async () => {
+      mockPrisma.$executeRawUnsafe.mockResolvedValue(3);
+      service.start();
+      mockPrisma.$executeRawUnsafe.mockClear();
+      await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
+      expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalled();
+    });
+
+    it('logs error on interval tick failure', async () => {
+      mockPrisma.$executeRawUnsafe
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce({ updated: 0, error: 'interval failure' });
+      service.start();
+      await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
+      expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(2);
+    });
+
     it('runs immediately on start', async () => {
       mockPrisma.$executeRawUnsafe.mockResolvedValue(5);
-      const consoleSpy = vi.spyOn(console, 'log');
+      const consoleSpy = jest.spyOn(console, 'log');
       service.start();
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
 
     it('sets up interval', () => {
-      const setIntervalSpy = vi.spyOn(global, 'setInterval');
+      const setIntervalSpy = jest.spyOn(global, 'setInterval');
       service.start();
       expect(setIntervalSpy).toHaveBeenCalled();
       setIntervalSpy.mockRestore();
     });
 
     it('does not set up interval twice', () => {
-      const setIntervalSpy = vi.spyOn(global, 'setInterval');
+      const setIntervalSpy = jest.spyOn(global, 'setInterval');
       service.start();
       service.start();
       expect(setIntervalSpy).toHaveBeenCalledTimes(1);
@@ -77,18 +119,18 @@ describe('BackgroundJobService', () => {
 
     it('logs transited orders', async () => {
       mockPrisma.$executeRawUnsafe.mockResolvedValue(5);
-      const consoleSpy = vi.spyOn(console, 'log');
+      const consoleSpy = jest.spyOn(console, 'log');
       service.start();
-      await vi.advanceTimersByTimeAsync(1);
+      await jest.advanceTimersByTimeAsync(1);
       expect(consoleSpy).toHaveBeenCalledWith('[BACKGROUND JOB] Transited 5 orders to PROCESSING');
       consoleSpy.mockRestore();
     });
 
     it('logs error on failure', async () => {
       mockPrisma.$executeRawUnsafe.mockRejectedValue(new Error('DB error'));
-      const consoleSpy = vi.spyOn(console, 'error');
+      const consoleSpy = jest.spyOn(console, 'error');
       service.start();
-      await vi.advanceTimersByTimeAsync(1);
+      await jest.advanceTimersByTimeAsync(1);
       expect(consoleSpy).toHaveBeenCalledWith('[BACKGROUND JOB] Error:', 'DB error');
       consoleSpy.mockRestore();
     });
@@ -96,7 +138,7 @@ describe('BackgroundJobService', () => {
 
   describe('stop', () => {
     it('clears the interval', () => {
-      const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
+      const clearIntervalSpy = jest.spyOn(global, 'clearInterval');
       service.start();
       service.stop();
       expect(clearIntervalSpy).toHaveBeenCalled();

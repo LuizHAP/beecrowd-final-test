@@ -1,12 +1,9 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { BackgroundJobService } from './background-job.service';
-import { PrismaService } from '../common/prisma/prisma.service';
+import { PrismaModule } from '../common/prisma/prisma.module';
 
-@Module({})
-export class BackgroundJobModule implements OnModuleInit {
-  constructor(private jobService: BackgroundJobService) {}
-
-  onModuleInit() {
-    this.jobService.start();
-  }
-}
+@Module({
+  imports: [PrismaModule],
+  providers: [BackgroundJobService],
+})
+export class BackgroundJobModule {}

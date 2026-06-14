@@ -77,8 +77,8 @@ The background job that transitions PENDING → PROCESSING uses `SELECT ... FOR 
 ### Docker Compose
 
 ```bash
-docker compose up -d  # Starts PostgreSQL
-npm run start:dev     # Starts NestJS in watch mode
+docker compose up -d  # Starts PostgreSQL + API (full stack)
+npm run start:dev     # Starts NestJS in watch mode (DB only via compose)
 ```
 
 ---
@@ -123,7 +123,18 @@ All AI decisions that affect business state (cancellations, status changes) are 
 
 | Component | Tests | Coverage |
 |-----------|-------|----------|
-| Orders Service | 10 | Create, list, detail, cancel, validation |
-| Background Job | 4 | Success, empty, error, SKIP LOCKED |
-| AI Agent | 7 | Injection, cancel, status, help, logging |
-| **Total** | **21** | **All passing** |
+| Orders Service | 18 | Create, list, detail, cancel, validation |
+| Background Job | 11 | Success, empty, error, SKIP LOCKED, scheduling |
+| AI Agent | 58 | Injection, cancel, status, help, logging |
+| E2E (API) | 22 | Order CRUD, status transitions, AI chat |
+| **Total** | **169** | **All passing** (`npm run test:all`) |
+
+### Local Setup
+
+```bash
+cp .env.example .env
+docker compose up -d        # PostgreSQL (port 5433) + API (port 3000)
+npm run test:all            # 147 unit + 22 E2E tests (requires PostgreSQL via Docker)
+```
+
+> **Note:** Docker PostgreSQL is exposed on host port **5433** to avoid conflicts with local Postgres installations on 5432.

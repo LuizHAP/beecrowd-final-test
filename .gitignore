@@ -1,12 +1,12 @@
 # Dependencies
 node_modules/
-package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
 # Build output
 dist/
 out/
+tsconfig.tsbuildinfo
 
 # IDE
 .vscode/

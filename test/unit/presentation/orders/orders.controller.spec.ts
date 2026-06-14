@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { OrdersController } from './orders.controller';
-import { CreateOrderDto, ListOrdersDto } from './dto';
+import { OrdersController } from '@/orders/orders.controller';
+import { CreateOrderDto, ListOrdersDto } from '@/orders/dto';
 
 describe('OrdersController', () => {
   let controller: OrdersController;
@@ -8,10 +7,10 @@ describe('OrdersController', () => {
 
   beforeEach(() => {
     mockService = {
-      create: vi.fn(),
-      findAll: vi.fn(),
-      findOne: vi.fn(),
-      cancel: vi.fn(),
+      create: jest.fn(),
+      findAll: jest.fn(),
+      findOne: jest.fn(),
+      cancel: jest.fn(),
     };
     controller = new OrdersController(mockService);
   });

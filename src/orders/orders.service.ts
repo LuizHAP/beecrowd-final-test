@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Order } from '../domain/order/order.entity';
 import { OrderItem } from '../domain/order/order-item.entity';
 import { OrderStatus } from '../domain/order/order-status';
@@ -11,6 +11,10 @@ export class OrdersService {
 
   async create(dto: CreateOrderDto): Promise<OrderResponseDto> {
     const { items } = dto;
+
+    if (!items || items.length === 0) {
+      throw new BadRequestException('Order must contain at least one item');
+    }
 
     // Validate items using OrderItem constructor
     const orderItems = items.map((item) => new OrderItem({
@@ -49,6 +53,12 @@ export class OrdersService {
     const order = await this.orderRepo.findById(id);
     if (!order) {
       throw new NotFoundException('Order not found');
+    }
+
+    if (!order.canCancel()) {
+      throw new BadRequestException(
+        `Order cannot be cancelled. Current status: ${order.status}`,
+      );
     }
 
     order.cancel();

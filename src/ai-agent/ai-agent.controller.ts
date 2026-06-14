@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Query } from '@nestjs/common';
+import { Controller, Post, Get, Body, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { AiAgentService } from './ai-agent.service';
 
@@ -8,6 +8,7 @@ export class AiAgentController {
   constructor(private aiService: AiAgentService) {}
 
   @Post('chat')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Process a message with the AI agent' })
   @ApiResponse({ status: 200, description: 'Message processed successfully' })
   async chat(@Body() body: { message: string; orderId?: string }) {

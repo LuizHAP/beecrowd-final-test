@@ -12,6 +12,7 @@ enum OrderStatus {
   PROCESSING
   SHIPPED
   DELIVERED
+  CANCELLED
 }
 
 model Order {

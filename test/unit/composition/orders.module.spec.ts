@@ -1,5 +1,4 @@
-import { describe, it, expect } from 'vitest';
-import { OrdersModule } from './orders.module';
+import { OrdersModule } from '@/orders/orders.module';
 
 describe('OrdersModule', () => {
   it('is defined', () => {
