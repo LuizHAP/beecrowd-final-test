@@ -1,18 +1,28 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
 import { PrismaService } from "../common/prisma/prisma.service";
+import { LoggingService } from "../common/logging/logging.service";
 
 @Injectable()
-export class BackgroundJobService implements OnModuleInit {
+export class BackgroundJobService implements OnModuleInit, OnModuleDestroy {
   private intervalId: ReturnType<typeof setInterval> | null = null;
+  private logger: LoggingService;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    loggingService: LoggingService,
+  ) {
+    this.logger = loggingService.child("BackgroundJob");
+  }
 
   async onModuleInit() {
-    // Skip scheduled job during automated tests to avoid race conditions with E2E assertions
     if (process.env.NODE_ENV === "test") {
       return;
     }
     this.start();
+  }
+
+  onModuleDestroy() {
+    this.stop();
   }
 
   start() {
@@ -25,7 +35,7 @@ export class BackgroundJobService implements OnModuleInit {
         void this.transitionPendingToProcessing();
       },
       5 * 60 * 1000,
-    ); // 5 minutes
+    );
   }
 
   stop() {
@@ -52,11 +62,11 @@ export class BackgroundJobService implements OnModuleInit {
         )
       `);
 
-      console.log(`[BACKGROUND JOB] Transited ${result} orders to PROCESSING`);
+      this.logger.info("Orders transitioned to PROCESSING", { count: result });
       return { updated: result };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      console.error("[BACKGROUND JOB] Error:", errorMsg);
+      this.logger.error("Background job failed", { error: errorMsg });
       return { updated: 0, error: errorMsg };
     }
   }

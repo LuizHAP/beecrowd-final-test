@@ -13,15 +13,11 @@ import { CreateOrderDto, ListOrdersDto, OrderResponseDto } from "./dto";
 export class OrdersService {
   constructor(private readonly orderRepo: PrismaOrderRepository) {}
 
-  async create(dto: CreateOrderDto): Promise<OrderResponseDto> {
-    const { items } = dto;
-
-    if (!items || items.length === 0) {
+  async create(dto: CreateOrderDto): Promise<Order> {
+    if (!dto.items || dto.items.length === 0) {
       throw new BadRequestException("Order must contain at least one item");
     }
-
-    // Validate items using OrderItem constructor
-    const orderItems = items.map(
+    const orderItems = dto.items.map(
       (item) =>
         new OrderItem({
           id: "",
@@ -30,7 +26,6 @@ export class OrdersService {
           unitPrice: item.unitPrice,
         }),
     );
-
     const order = new Order({
       id: "",
       status: OrderStatus.PENDING,
@@ -38,53 +33,44 @@ export class OrdersService {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-
-    const created = await this.orderRepo.create(order);
-    return this.toResponseDto(created);
+    return this.orderRepo.create(order);
   }
 
-  async findAll(dto: ListOrdersDto): Promise<OrderResponseDto[]> {
-    const orders = await this.orderRepo.findAll(dto.status);
-    return orders.map((o) => this.toResponseDto(o));
+  async findAll(dto: ListOrdersDto): Promise<Order[]> {
+    return this.orderRepo.findAll(dto.status);
   }
 
-  async findOne(id: string): Promise<OrderResponseDto> {
+  async findOne(id: string): Promise<Order> {
     const order = await this.orderRepo.findById(id);
     if (!order) {
       throw new NotFoundException("Order not found");
     }
-    return this.toResponseDto(order);
+    return order;
   }
 
-  async cancel(
-    id: string,
-  ): Promise<{ message: string; order: OrderResponseDto }> {
+  async cancel(id: string): Promise<void> {
     const order = await this.orderRepo.findById(id);
     if (!order) {
       throw new NotFoundException("Order not found");
     }
-
     if (!order.canCancel()) {
       throw new BadRequestException(
         `Order cannot be cancelled. Current status: ${order.status}`,
       );
     }
-
     order.cancel();
     await this.orderRepo.updateStatus(id, OrderStatus.CANCELLED);
-
-    return { message: "Order cancelled", order: this.toResponseDto(order) };
   }
 
-  private toResponseDto(order: Order): OrderResponseDto {
+  toResponseDto(order: Order): OrderResponseDto {
     return {
       id: order.id,
       status: order.status,
-      items: order.items.map((i) => ({
-        id: i.id,
-        productId: i.productId,
-        quantity: i.quantity,
-        unitPrice: i.unitPrice,
+      items: order.items.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
       })),
       total: order.total,
       createdAt: order.createdAt,

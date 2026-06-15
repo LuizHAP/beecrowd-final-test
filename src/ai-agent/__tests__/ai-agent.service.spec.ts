@@ -28,12 +28,18 @@ const mockPrisma = {
   },
 };
 
+const mockLoggingService = {
+  child: jest.fn().mockReturnThis(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+  log: jest.fn(),
+};
+
 const mockLLMService = {
   isEnabled: jest.fn().mockReturnValue(false),
-  get model() {
-    return "gpt-4o-mini";
-  },
-  classifyIntent: jest.fn().mockImplementation((msg) => {
+  classifyIntent: jest.fn().mockImplementation((msg: string) => {
     const lower = msg.toLowerCase();
     if (/cancel|refund|return|stop|undo/.test(lower))
       return { intent: "CANCEL_ORDER", shouldCallTool: false, confidence: 0 };
@@ -46,31 +52,11 @@ const mockLLMService = {
   generateResponse: jest.fn().mockResolvedValue(""),
 };
 
-const mockOrdersService = {
-  create: jest.fn(),
-};
-
-jest.mock("../../common/prisma/prisma.service", () => ({
-  PrismaService: jest.fn(() => mockPrisma),
-}));
-
-// Isolate from llm.service.spec.ts jest.mock('openai')
-jest.doMock("openai", () => {
-  const ActualOpenAI = jest.requireActual("openai").OpenAI;
-  return {
-    ...jest.requireActual("openai"),
-    OpenAI: ActualOpenAI,
-    default: ActualOpenAI,
-  };
-});
-
 describe("AiAgentService", () => {
   let service: AiAgentService;
 
   beforeEach(() => {
-    jest.resetModules();
     jest.clearAllMocks();
-    // Re-establish default mockImplementation after clearAllMocks
     mockLLMService.classifyIntent.mockImplementation((msg) => {
       const lower = msg.toLowerCase();
       if (/cancel|refund|return|stop|undo/.test(lower))
@@ -84,8 +70,8 @@ describe("AiAgentService", () => {
     service = new AiAgentService(
       mockOrderRepo as any,
       mockPrisma as any,
-      mockOrdersService as any,
       mockLLMService as any,
+      mockLoggingService as any,
     );
   });
 
@@ -182,8 +168,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         mockLLMService as any,
+        mockLoggingService as any,
       );
 
       const { response, log } = await service.process("Hello");
@@ -266,8 +252,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         mockLLMService as any,
+        mockLoggingService as any,
       );
 
       const { response, log } = await service.process(
@@ -295,8 +281,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         mockLLMService as any,
+        mockLoggingService as any,
       );
 
       const { response } = await service.process("Create an order");
@@ -332,9 +318,6 @@ describe("AiAgentService", () => {
     beforeEach(() => {
       llmService = {
         isEnabled: jest.fn().mockReturnValue(true),
-        get model() {
-          return "gpt-4o-mini";
-        },
         classifyIntent: jest.fn().mockResolvedValue({
           intent: "GENERAL_HELP",
           shouldCallTool: false,
@@ -345,8 +328,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         llmService as any,
+        mockLoggingService as any,
       );
     });
 
@@ -411,9 +394,6 @@ describe("AiAgentService", () => {
     beforeEach(() => {
       llmService = {
         isEnabled: jest.fn().mockReturnValue(true),
-        get model() {
-          return "gpt-4o-mini";
-        },
         classifyIntent: jest.fn().mockResolvedValue({
           intent: "GENERAL_HELP",
           shouldCallTool: false,
@@ -424,8 +404,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         llmService as any,
+        mockLoggingService as any,
       );
     });
 
@@ -446,7 +426,7 @@ describe("AiAgentService", () => {
         intent: "CANCEL_ORDER",
         shouldCallTool: true,
         confidence: 0.9,
-        orderId: "llm-extracted-id",
+        toolArgs: { orderId: "llm-extracted-id" },
       });
 
       const order = makeOrder({
@@ -467,7 +447,7 @@ describe("AiAgentService", () => {
         intent: "CHECK_STATUS",
         shouldCallTool: false,
         confidence: 0.9,
-        orderId: "llm-extracted-id",
+        toolArgs: { orderId: "llm-extracted-id" },
       });
 
       const order = makeOrder({
@@ -490,8 +470,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         mockLLMService as any,
+        mockLoggingService as any,
       );
     });
 
@@ -547,8 +527,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         mockLLMService as any,
+        mockLoggingService as any,
       );
     });
 
@@ -605,8 +585,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         mockLLMService as any,
+        mockLoggingService as any,
       );
 
       const { response } = await service.process("Cancel my order");
@@ -628,8 +608,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         mockLLMService as any,
+        mockLoggingService as any,
       );
 
       const { response, log } = await service.process(
@@ -658,8 +638,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         mockLLMService as any,
+        mockLoggingService as any,
       );
 
       const { response } = await service.process(
@@ -740,10 +720,7 @@ describe("AiAgentService", () => {
   });
 
   describe("persistAILog error handling", () => {
-    it("catches and logs prisma errors", async () => {
-      const consoleSpy = jest
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+    it("catches and logs prisma errors via LoggingService", async () => {
       mockPrisma.aILog.create.mockRejectedValue(new Error("Prisma error"));
 
       await (service as any).persistAILog({
@@ -756,11 +733,23 @@ describe("AiAgentService", () => {
         promptInjectionDetected: false,
       });
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "[AI LOG PERSIST ERROR]",
-        expect.any(Error),
-      );
-      consoleSpy.mockRestore();
+      expect(mockLoggingService.error).toHaveBeenCalled();
+    });
+
+    it("catches and logs non-Error rejections via LoggingService", async () => {
+      mockPrisma.aILog.create.mockRejectedValue("string error");
+
+      await (service as any).persistAILog({
+        intent: "GENERAL_HELP",
+        model: "gpt-4o-mini",
+        tokensUsed: 0,
+        responseTimeMs: 100,
+        toolCalled: null,
+        toolSuccess: null,
+        promptInjectionDetected: false,
+      });
+
+      expect(mockLoggingService.error).toHaveBeenCalled();
     });
   });
 
@@ -781,8 +770,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         mockLLMService as any,
+        mockLoggingService as any,
       );
 
       const { response } = await service.process("hello");
@@ -804,8 +793,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         mockLLMService as any,
+        mockLoggingService as any,
       );
 
       const { response } = await service.process("Cancel my order");
@@ -827,8 +816,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         mockLLMService as any,
+        mockLoggingService as any,
       );
 
       const { response, log } = await service.process(
@@ -873,8 +862,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         mockLLMService as any,
+        mockLoggingService as any,
       );
 
       const { response } = await service.process("hello");
@@ -893,8 +882,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         mockLLMService as any,
+        mockLoggingService as any,
       );
 
       const { response } = await service.process("hello");
@@ -903,7 +892,7 @@ describe("AiAgentService", () => {
       );
     });
 
-    it("covers orderContext ? true branch in LLM fallback path (line 172)", async () => {
+    it("covers orderContext ? true branch in LLM fallback path", async () => {
       mockLLMService.isEnabled.mockReturnValue(true);
       mockLLMService.classifyIntent.mockResolvedValue({
         intent: "GENERAL_HELP",
@@ -921,8 +910,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         mockLLMService as any,
+        mockLoggingService as any,
       );
 
       const { response } = await service.process("hello", "order-with-context");
@@ -931,7 +920,7 @@ describe("AiAgentService", () => {
       );
     });
 
-    it("covers orderContext ? true branch in non-LLM path (line 175)", async () => {
+    it("covers orderContext ? true branch in non-LLM path", async () => {
       mockLLMService.isEnabled.mockReturnValue(false);
       mockOrderRepo.findById.mockResolvedValue(
         makeOrder({
@@ -943,8 +932,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         mockLLMService as any,
+        mockLoggingService as any,
       );
 
       const { response } = await service.process("help", "order-with-context");
@@ -953,7 +942,7 @@ describe("AiAgentService", () => {
       );
     });
 
-    it("covers non-Error throw in CREATE_ORDER LLM tool args path (line 318)", async () => {
+    it("covers non-Error throw in CREATE_ORDER LLM tool args path", async () => {
       mockLLMService.isEnabled.mockReturnValue(true);
       mockLLMService.classifyIntent.mockResolvedValue({
         intent: "CREATE_ORDER",
@@ -965,8 +954,8 @@ describe("AiAgentService", () => {
       service = new AiAgentService(
         mockOrderRepo as any,
         mockPrisma as any,
-        mockOrdersService as any,
         mockLLMService as any,
+        mockLoggingService as any,
       );
 
       const { response } = await service.process("Create an order");

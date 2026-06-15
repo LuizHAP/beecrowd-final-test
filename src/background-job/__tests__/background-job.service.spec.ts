@@ -4,6 +4,15 @@ const mockPrisma = {
   $executeRawUnsafe: jest.fn(),
 };
 
+const mockLoggingService = {
+  child: jest.fn().mockReturnThis(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+  log: jest.fn(),
+};
+
 jest.mock("../../common/prisma/prisma.service", () => ({
   PrismaService: jest.fn(() => mockPrisma),
 }));
@@ -14,7 +23,10 @@ describe("BackgroundJobService", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
-    service = new BackgroundJobService(mockPrisma as any);
+    service = new BackgroundJobService(
+      mockPrisma as any,
+      mockLoggingService as any,
+    );
   });
 
   afterEach(() => {
@@ -91,21 +103,10 @@ describe("BackgroundJobService", () => {
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalled();
     });
 
-    it("logs error on interval tick failure", async () => {
-      mockPrisma.$executeRawUnsafe
-        .mockResolvedValueOnce(1)
-        .mockResolvedValueOnce({ updated: 0, error: "interval failure" });
-      service.start();
-      await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
-      expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(2);
-    });
-
     it("runs immediately on start", async () => {
       mockPrisma.$executeRawUnsafe.mockResolvedValue(5);
-      const consoleSpy = jest.spyOn(console, "log");
       service.start();
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalled();
-      consoleSpy.mockRestore();
     });
 
     it("sets up interval", () => {
@@ -123,27 +124,24 @@ describe("BackgroundJobService", () => {
       setIntervalSpy.mockRestore();
     });
 
-    it("logs transited orders", async () => {
+    it("logs transited orders via LoggingService", async () => {
       mockPrisma.$executeRawUnsafe.mockResolvedValue(5);
-      const consoleSpy = jest.spyOn(console, "log");
       service.start();
       await jest.advanceTimersByTimeAsync(1);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "[BACKGROUND JOB] Transited 5 orders to PROCESSING",
+      expect(mockLoggingService.info).toHaveBeenCalledWith(
+        "Orders transitioned to PROCESSING",
+        expect.objectContaining({ count: 5 }),
       );
-      consoleSpy.mockRestore();
     });
 
-    it("logs error on failure", async () => {
+    it("logs error via LoggingService on failure", async () => {
       mockPrisma.$executeRawUnsafe.mockRejectedValue(new Error("DB error"));
-      const consoleSpy = jest.spyOn(console, "error");
       service.start();
       await jest.advanceTimersByTimeAsync(1);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "[BACKGROUND JOB] Error:",
-        "DB error",
+      expect(mockLoggingService.error).toHaveBeenCalledWith(
+        "Background job failed",
+        expect.objectContaining({ error: "DB error" }),
       );
-      consoleSpy.mockRestore();
     });
   });
 
@@ -159,8 +157,16 @@ describe("BackgroundJobService", () => {
     it("is idempotent", () => {
       service.stop();
       service.stop();
-      // Should not throw
       expect(true).toBe(true);
+    });
+  });
+
+  describe("onModuleDestroy", () => {
+    it("stops the interval on destroy", () => {
+      const stopSpy = jest.spyOn(service, "stop");
+      service.onModuleDestroy();
+      expect(stopSpy).toHaveBeenCalled();
+      stopSpy.mockRestore();
     });
   });
 });

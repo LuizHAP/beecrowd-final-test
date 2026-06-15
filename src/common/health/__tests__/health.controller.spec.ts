@@ -1,5 +1,14 @@
 import { HealthController } from "../health.controller";
 
+const mockLoggingService = {
+  child: jest.fn().mockReturnThis(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+  log: jest.fn(),
+};
+
 describe("HealthController", () => {
   let controller: HealthController;
   let mockPrisma: any;
@@ -8,7 +17,7 @@ describe("HealthController", () => {
     mockPrisma = {
       $queryRaw: jest.fn(),
     };
-    controller = new HealthController(mockPrisma);
+    controller = new HealthController(mockPrisma, mockLoggingService as any);
   });
 
   describe("check", () => {

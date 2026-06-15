@@ -2,6 +2,7 @@ const mockApp = {
   useGlobalPipes: jest.fn(),
   enableCors: jest.fn(),
   setGlobalPrefix: jest.fn(),
+  use: jest.fn(),
   listen: jest.fn().mockResolvedValue(undefined),
 };
 
@@ -30,6 +31,19 @@ jest.mock("@nestjs/swagger", () => ({
   },
 }));
 
+jest.mock("pino-http", () =>
+  jest.fn().mockReturnValue({
+    headers: {},
+    customProps: () => ({}),
+    customReceivedMessage: () => "",
+  }),
+);
+
+jest.mock("../common/logging/correlation-id.middleware", () => ({
+  CorrelationIdMiddleware: class CorrelationIdMiddleware {},
+  CORRELATION_ID_HEADER: "x-correlation-id",
+}));
+
 import { NestFactory } from "@nestjs/core";
 import { SwaggerModule } from "@nestjs/swagger";
 import { bootstrap } from "../bootstrap";
@@ -41,29 +55,20 @@ describe("bootstrap", () => {
   });
 
   it("creates and configures the NestJS application", async () => {
-    const logSpy = jest
-      .spyOn(console, "log")
-      .mockImplementation(() => undefined);
-
     await bootstrap();
 
     expect(NestFactory.create).toHaveBeenCalled();
     expect(mockApp.useGlobalPipes).toHaveBeenCalled();
     expect(mockApp.enableCors).toHaveBeenCalled();
     expect(mockApp.setGlobalPrefix).toHaveBeenCalledWith("api");
+    expect(mockApp.use).toHaveBeenCalled();
     expect(SwaggerModule.createDocument).toHaveBeenCalled();
     expect(SwaggerModule.setup).toHaveBeenCalledWith("api", mockApp, {});
     expect(mockApp.listen).toHaveBeenCalledWith(3000);
-    expect(logSpy).toHaveBeenCalledWith(
-      "E-Commerce AI Support running on port 3000",
-    );
-
-    logSpy.mockRestore();
   });
 
   it("uses PORT from environment when provided", async () => {
     process.env.PORT = "4000";
-    jest.spyOn(console, "log").mockImplementation(() => undefined);
 
     await bootstrap();
 

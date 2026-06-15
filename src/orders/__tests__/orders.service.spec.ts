@@ -200,7 +200,7 @@ describe("OrdersService", () => {
       mockRepo.updateStatus.mockResolvedValue(undefined);
 
       const result = await service.cancel("test-id");
-      expect(result.message).toBe("Order cancelled");
+      expect(result).toBeUndefined();
       expect(mockRepo.updateStatus).toHaveBeenCalledWith(
         "test-id",
         OrderStatus.CANCELLED,
@@ -252,6 +252,43 @@ describe("OrdersService", () => {
       await expect(service.cancel("non-existent")).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe("toResponseDto", () => {
+    it("should convert an Order to OrderResponseDto", () => {
+      const item = makeItem({
+        id: "item-1",
+        productId: "prod-1",
+        quantity: 2,
+        unitPrice: 10,
+      });
+
+      const order = makeOrder({
+        id: "test-id",
+        status: OrderStatus.PENDING,
+        items: [item],
+        createdAt: new Date("2024-01-01"),
+        updatedAt: new Date("2024-01-01"),
+      });
+
+      const dto = service.toResponseDto(order);
+
+      expect(dto).toEqual({
+        id: "test-id",
+        status: OrderStatus.PENDING,
+        items: [
+          {
+            id: "item-1",
+            productId: "prod-1",
+            quantity: 2,
+            unitPrice: 10,
+          },
+        ],
+        total: order.total,
+        createdAt: new Date("2024-01-01"),
+        updatedAt: new Date("2024-01-01"),
+      });
     });
   });
 });

@@ -1,11 +1,12 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../common/prisma/prisma.service";
+import { LoggingService } from "../common/logging/logging.service";
 import { PrismaOrderRepository } from "../orders/prisma-order.repository";
-import { OrdersService } from "../orders/orders.service";
 import { Order } from "../domain/order/order.entity";
+import { OrderItem } from "../domain/order/order-item.entity";
 import { OrderStatus } from "../domain/order/order-status";
 import knowledgeBase from "../../knowledge_base.json";
-import { LLMService } from "./llm.service";
+import { LLMService, IntentClassification } from "./llm.service";
 
 export interface AILogEntry {
   intent: "CANCEL_ORDER" | "CHECK_STATUS" | "GENERAL_HELP" | "CREATE_ORDER";
@@ -21,18 +22,15 @@ export interface AILogEntry {
 
 @Injectable()
 export class AiAgentService {
-  private readonly logger = new Logger(AiAgentService.name);
-  private readonly llmEnabled: boolean;
-  private readonly llmModel: string;
+  private logger: LoggingService;
 
   constructor(
     private orderRepo: PrismaOrderRepository,
     private prisma: PrismaService,
-    private ordersService: OrdersService,
     private llmService: LLMService,
+    loggingService: LoggingService,
   ) {
-    this.llmEnabled = this.llmService.isEnabled();
-    this.llmModel = this.llmService["model"];
+    this.logger = loggingService.child("AiAgent");
   }
 
   async process(
@@ -42,21 +40,17 @@ export class AiAgentService {
     const startTime = Date.now();
     const promptInjectionDetected = this.detectPromptInjection(message);
 
-    // Use LLM for intent classification if enabled, otherwise use deterministic
     let intent: AILogEntry["intent"];
-    let llmIntentResult = null;
+    let llmIntentResult: IntentClassification | null = null;
 
-    if (this.llmEnabled && !promptInjectionDetected) {
-      const ragContext = this.buildRAGContext("GENERAL_HELP");
+    if (this.llmService.isEnabled() && !promptInjectionDetected) {
       try {
-        llmIntentResult = await this.llmService.classifyIntent(
-          message,
-          ragContext,
-        );
+        llmIntentResult = await this.llmService.classifyIntent(message);
         intent = llmIntentResult.intent;
-        this.logger.debug(
-          `LLM classified intent: ${intent} (confidence: ${llmIntentResult.confidence})`,
-        );
+        this.logger.debug("LLM classified intent", {
+          intent,
+          confidence: llmIntentResult.confidence,
+        });
       } catch {
         intent = this.extractIntent(message);
       }
@@ -67,7 +61,7 @@ export class AiAgentService {
     const log: AILogEntry = {
       intent,
       model: this.llmService.isEnabled()
-        ? this.llmService["model"]
+        ? "gpt-4o-mini"
         : "local-deterministic",
       tokensUsed: 0,
       responseTimeMs: 0,
@@ -78,7 +72,6 @@ export class AiAgentService {
       rawOutput: "",
     };
 
-    // Guardrail: reject prompt injection
     if (promptInjectionDetected) {
       log.responseTimeMs = Date.now() - startTime;
       log.rawOutput =
@@ -89,18 +82,16 @@ export class AiAgentService {
 
     const ragContext = this.buildRAGContext(intent);
 
-    // Get order context if provided
-    let orderContext = null;
+    let orderContext: Order | null = null;
     if (orderId) {
       orderContext = await this.getOrderContext(orderId);
     }
 
-    // Handle cancel intent with tool calling
     if (intent === "CANCEL_ORDER") {
       const targetOrderId =
         orderId ||
         this.extractOrderIdFromMessage(message) ||
-        llmIntentResult?.orderId;
+        llmIntentResult?.toolArgs?.orderId;
 
       if (!targetOrderId) {
         log.responseTimeMs = Date.now() - startTime;
@@ -119,7 +110,6 @@ export class AiAgentService {
       return { response: result.message, log };
     }
 
-    // Handle create order intent
     if (intent === "CREATE_ORDER") {
       const createResult = await this.handleCreateOrder(
         message,
@@ -131,12 +121,11 @@ export class AiAgentService {
       return { response: createResult.response, log };
     }
 
-    // Handle check status intent
     if (intent === "CHECK_STATUS") {
       const targetOrderId =
         orderId ||
         this.extractOrderIdFromMessage(message) ||
-        llmIntentResult?.orderId;
+        llmIntentResult?.toolArgs?.orderId;
 
       if (!targetOrderId) {
         log.responseTimeMs = Date.now() - startTime;
@@ -159,18 +148,15 @@ export class AiAgentService {
       };
     }
 
-    // General help — use LLM for response if enabled
     let responseText: string;
     if (this.llmService.isEnabled() && llmIntentResult) {
       const llmResponse = await this.llmService.generateResponse(
-        intent,
-        message,
         ragContext,
+        message,
       );
       responseText =
         llmResponse ||
         `Here's what I can help you with:\n\n${ragContext}\n\n${orderContext ? `Your order ${orderContext.id} is currently ${orderContext.status}.` : "Please provide an order ID for specific information."}`;
-      log.tokensUsed = 0; // Will be set after persist
     } else {
       responseText = `Here's what I can help you with:\n\n${ragContext}\n\n${orderContext ? `Your order ${orderContext.id} is currently ${orderContext.status}.` : "Please provide an order ID for specific information."}`;
     }
@@ -266,61 +252,15 @@ export class AiAgentService {
 
   private async handleCreateOrder(
     message: string,
-    llmResult?: { toolArgs?: Record<string, string> },
+    llmResult?: IntentClassification,
   ): Promise<{ response: string }> {
-    // Try to extract from LLM tool args first
-    const toolArgs = llmResult?.toolArgs;
+    const toolArgs = llmResult?.toolArgs as
+      | { productId: string; quantity: string; unitPrice: string }
+      | undefined;
     if (toolArgs?.productId && toolArgs?.quantity && toolArgs?.unitPrice) {
-      try {
-        const dto = {
-          items: [
-            {
-              productId: toolArgs.productId,
-              quantity: parseInt(toolArgs.quantity, 10),
-              unitPrice: parseFloat(toolArgs.unitPrice),
-            },
-          ],
-        };
-
-        // Validate with OrderItem constructor
-        const { OrderItem } = await import("../domain/order/order-item.entity");
-        const { Order } = await import("../domain/order/order.entity");
-        const { OrderStatus } = await import("../domain/order/order-status");
-
-        const orderItems = [
-          new OrderItem({
-            id: "",
-            productId: dto.items[0].productId,
-            quantity: dto.items[0].quantity,
-            unitPrice: dto.items[0].unitPrice,
-          }),
-        ];
-
-        const order = new Order({
-          id: "",
-          status: OrderStatus.PENDING,
-          items: orderItems,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-
-        const created = await this.orderRepo.create(order);
-        const total = created.items.reduce(
-          (sum, item) => sum + item.quantity * item.unitPrice,
-          0,
-        );
-
-        return {
-          response: `Order created successfully!\n\nOrder ID: ${created.id}\nStatus: PENDING\nTotal: $${total.toFixed(2)}\n\nYour order will be automatically processed within 5 minutes.`,
-        };
-      } catch (error) {
-        return {
-          response: `I couldn't create the order: ${error instanceof Error ? error.message : "Invalid data"}. Please provide a valid product ID, quantity, and price.`,
-        };
-      }
+      return this.createFromArgs(toolArgs);
     }
 
-    // Try regex extraction as fallback
     const productIdMatch = message.match(
       /(?:product|item|sku)[s]?\s*[:\s]*([A-Za-z0-9_-]+)/i,
     );
@@ -336,20 +276,28 @@ export class AiAgentService {
       };
     }
 
+    return this.createFromArgs({
+      productId: productIdMatch[1],
+      quantity: quantityMatch[1],
+      unitPrice: priceMatch[1],
+    });
+  }
+
+  private async createFromArgs(args: {
+    productId: string;
+    quantity: string;
+    unitPrice: string;
+  }): Promise<{ response: string }> {
     try {
       const dto = {
         items: [
           {
-            productId: productIdMatch[1],
-            quantity: parseInt(quantityMatch[1], 10),
-            unitPrice: parseFloat(priceMatch[1]),
+            productId: args.productId,
+            quantity: parseInt(args.quantity, 10),
+            unitPrice: parseFloat(args.unitPrice),
           },
         ],
       };
-
-      const { OrderItem } = await import("../domain/order/order-item.entity");
-      const { Order } = await import("../domain/order/order.entity");
-      const { OrderStatus } = await import("../domain/order/order-status");
 
       const orderItems = [
         new OrderItem({
@@ -379,7 +327,7 @@ export class AiAgentService {
       };
     } catch (error) {
       return {
-        response: `I couldn't create the order: ${error instanceof Error ? error.message : "Invalid data"}. Please check the product ID, quantity, and price.`,
+        response: `I couldn't create the order: ${error instanceof Error ? error.message : "Invalid data"}. Please provide a valid product ID, quantity, and price.`,
       };
     }
   }
@@ -401,7 +349,9 @@ export class AiAgentService {
         },
       });
     } catch (error) {
-      console.error("[AI LOG PERSIST ERROR]", error);
+      this.logger.error("AI log persistence failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 

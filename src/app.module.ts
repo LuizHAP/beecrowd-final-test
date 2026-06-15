@@ -1,12 +1,24 @@
-import { Module } from "@nestjs/common";
-import { HealthController } from "./common/health/health.controller";
+import { MiddlewareConsumer, Module } from "@nestjs/common";
 import { PrismaModule } from "./common/prisma/prisma.module";
+import { LoggingModule } from "./common/logging/logging.module";
 import { OrdersModule } from "./orders/orders.module";
-import { BackgroundJobModule } from "./background-job/background-job.module";
 import { AiAgentModule } from "./ai-agent/ai-agent.module";
+import { BackgroundJobModule } from "./background-job/background-job.module";
+import { HealthController } from "./common/health/health.controller";
+import { CorrelationIdMiddleware } from "./common/logging/correlation-id.middleware";
 
 @Module({
-  imports: [PrismaModule, OrdersModule, BackgroundJobModule, AiAgentModule],
+  imports: [
+    PrismaModule,
+    LoggingModule,
+    OrdersModule,
+    AiAgentModule,
+    BackgroundJobModule,
+  ],
   controllers: [HealthController],
 })
-export class AppModule {}
+export class AppModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CorrelationIdMiddleware).forRoutes("*");
+  }
+}

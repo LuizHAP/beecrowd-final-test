@@ -1,3 +1,7 @@
+jest.mock("uuid", () => ({
+  v4: jest.fn().mockReturnValue("test-correlation-id"),
+}));
+
 import { AppModule } from "../app.module";
 
 describe("AppModule", () => {
@@ -5,17 +9,22 @@ describe("AppModule", () => {
     expect(AppModule).toBeDefined();
   });
 
-  it("is a class decorated with @Module", () => {
+  it("is a class", () => {
     expect(typeof AppModule).toBe("function");
   });
 
-  it("has the expected module configuration", () => {
-    expect(AppModule).toBeDefined();
-    expect(typeof AppModule).toBe("function");
+  it("has a configure method for middleware", () => {
+    expect(typeof AppModule.prototype.configure).toBe("function");
   });
 
-  it("is an instance of AppModule", () => {
+  it("configure method should register middleware", () => {
     const module = new AppModule();
-    expect(module).toBeInstanceOf(AppModule);
+    const mockApply = jest.fn().mockReturnThis();
+    const mockConsumer = {
+      apply: mockApply,
+    } as any;
+    mockConsumer.forRoutes = jest.fn();
+    module.configure(mockConsumer);
+    expect(mockApply).toHaveBeenCalled();
   });
 });

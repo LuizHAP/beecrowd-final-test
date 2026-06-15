@@ -1,84 +1,136 @@
-import { LLMService } from "../llm.service";
+const mockState: {
+  content: string | null;
+  fail: boolean;
+  failWithString: boolean;
+} = {
+  content: "Test response",
+  fail: false,
+  failWithString: false,
+};
+
+jest.mock("openai", () => ({
+  __esModule: true,
+  default: class MockOpenAI {
+    chat: any;
+    constructor() {
+      this.chat = {
+        completions: {
+          create: jest.fn().mockImplementation(() => {
+            if (mockState.failWithString) return Promise.reject("string error");
+            if (mockState.fail) return Promise.reject(new Error("API error"));
+            return Promise.resolve({
+              choices: [{ message: { content: mockState.content } }],
+            });
+          }),
+        },
+      };
+    }
+  },
+}));
+
+const mockLoggingService = {
+  child: jest.fn().mockReturnThis(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+  log: jest.fn(),
+};
 
 describe("LLMService", () => {
-  let service: LLMService;
+  let service: any;
 
   afterEach(() => {
     delete process.env.OPENAI_API_KEY;
     delete process.env.LLM_MODE;
     jest.clearAllMocks();
+    mockState.content = "Test response";
+    mockState.fail = false;
+    mockState.failWithString = false;
   });
 
   describe("constructor", () => {
     it("should not initialize OpenAI client when API key is not set", () => {
-      service = new LLMService();
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { LLMService } = require("../llm.service");
+      service = new LLMService(mockLoggingService as any);
       expect(service.isEnabled()).toBe(false);
     });
 
     it("should initialize OpenAI client when API key is set", () => {
       process.env.OPENAI_API_KEY = "test-key";
-      service = new LLMService();
-      // isEnabled requires both key and LLM_MODE=openai
-      expect(service.isEnabled()).toBe(false);
-    });
-
-    it("should return false when LLM_MODE is not openai", () => {
-      process.env.OPENAI_API_KEY = "test-key";
-      process.env.LLM_MODE = "deterministic";
-      service = new LLMService();
-      expect(service.isEnabled()).toBe(false);
-    });
-
-    it("should return true when both API key and LLM_MODE are set", () => {
-      process.env.OPENAI_API_KEY = "test-key";
-      process.env.LLM_MODE = "openai";
-      service = new LLMService();
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { LLMService } = require("../llm.service");
+      service = new LLMService(mockLoggingService as any);
       expect(service.isEnabled()).toBe(true);
     });
   });
 
   describe("classifyIntent", () => {
-    it("should return GENERAL_HELP when openai client is not initialized", async () => {
-      service = new LLMService();
-      const result = await service.classifyIntent("cancel order", "context");
+    it("should return GENERAL_HELP when client is not initialized", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { LLMService } = require("../llm.service");
+      service = new LLMService(mockLoggingService as any);
+      const result = await service.classifyIntent("cancel order");
       expect(result.intent).toBe("GENERAL_HELP");
       expect(result.shouldCallTool).toBe(false);
       expect(result.confidence).toBe(0);
     });
 
-    it("should return GENERAL_HELP when API call fails", async () => {
+    it("should return GENERAL_HELP when API call fails with Error", async () => {
       process.env.OPENAI_API_KEY = "test-key";
       process.env.LLM_MODE = "openai";
-      service = new LLMService();
+      mockState.fail = true;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { LLMService } = require("../llm.service");
+      service = new LLMService(mockLoggingService as any);
+      const result = await service.classifyIntent("cancel order");
+      expect(result.intent).toBe("GENERAL_HELP");
+      expect(result.shouldCallTool).toBe(false);
+    });
 
-      const result = await service.classifyIntent("cancel order", "context");
+    it("should handle non-Error rejection in classifyIntent", async () => {
+      process.env.OPENAI_API_KEY = "test-key";
+      process.env.LLM_MODE = "openai";
+      mockState.failWithString = true;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { LLMService } = require("../llm.service");
+      service = new LLMService(mockLoggingService as any);
+      const result = await service.classifyIntent("test");
       expect(result.intent).toBe("GENERAL_HELP");
       expect(result.shouldCallTool).toBe(false);
     });
   });
 
   describe("generateResponse", () => {
-    it("should return empty string when openai client is not initialized", async () => {
-      service = new LLMService();
-      const result = await service.generateResponse(
-        "GENERAL_HELP",
-        "hello",
-        "context",
-      );
-      expect(result).toBe("");
+    it("should return fallback when client is not initialized", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { LLMService } = require("../llm.service");
+      service = new LLMService(mockLoggingService as any);
+      const result = await service.generateResponse("GENERAL_HELP", "hello");
+      expect(result).toContain("sorry");
     });
 
-    it("should return fallback message when API call fails", async () => {
+    it("should return fallback message when API call fails with Error", async () => {
       process.env.OPENAI_API_KEY = "test-key";
       process.env.LLM_MODE = "openai";
-      service = new LLMService();
+      mockState.fail = true;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { LLMService } = require("../llm.service");
+      service = new LLMService(mockLoggingService as any);
+      const result = await service.generateResponse("GENERAL_HELP", "hello");
+      expect(result).toContain("sorry");
+    });
 
-      const result = await service.generateResponse(
-        "GENERAL_HELP",
-        "hello",
-        "context",
-      );
-      expect(result).toContain("apologize");
+    it("should handle non-Error rejection in generateResponse", async () => {
+      process.env.OPENAI_API_KEY = "test-key";
+      process.env.LLM_MODE = "openai";
+      mockState.failWithString = true;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { LLMService } = require("../llm.service");
+      service = new LLMService(mockLoggingService as any);
+      const result = await service.generateResponse("test", "test");
+      expect(result).toContain("sorry");
     });
   });
 });

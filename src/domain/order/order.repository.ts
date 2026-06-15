@@ -6,3 +6,5 @@ export interface OrderRepository {
   create(order: Order): Promise<Order>;
   updateStatus(id: string, status: string): Promise<void>;
 }
+
+export const ORDER_REPOSITORY = "ORDER_REPOSITORY";

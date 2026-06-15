@@ -5,6 +5,26 @@ import { OrderItem } from "../domain/order/order-item.entity";
 import { OrderStatus } from "../domain/order/order-status";
 import { PrismaService } from "../common/prisma/prisma.service";
 
+type PrismaStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "SHIPPED"
+  | "DELIVERED"
+  | "CANCELLED";
+
+interface PrismaOrder {
+  id: string;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+  items: Array<{
+    id: string;
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
+}
+
 @Injectable()
 export class PrismaOrderRepository implements OrderRepository {
   constructor(private prisma: PrismaService) {}
@@ -15,37 +35,22 @@ export class PrismaOrderRepository implements OrderRepository {
       include: { items: true },
     });
     if (!order) return null;
-    return new Order({
-      id: order.id,
-      status: order.status as OrderStatus,
-      items: order.items.map((i) => new OrderItem(i)),
-      createdAt: order.createdAt,
-      updatedAt: order.updatedAt,
-    });
+    return this.toDomain(order as unknown as PrismaOrder);
   }
 
   async findAll(status?: string): Promise<Order[]> {
     const orders = await this.prisma.order.findMany({
-      where: status ? { status: status as any } : undefined,
+      where: status ? { status: status as PrismaStatus } : undefined,
       include: { items: true },
       orderBy: { createdAt: "desc" },
     });
-    return orders.map(
-      (o) =>
-        new Order({
-          id: o.id,
-          status: o.status as OrderStatus,
-          items: o.items.map((i) => new OrderItem(i)),
-          createdAt: o.createdAt,
-          updatedAt: o.updatedAt,
-        }),
-    );
+    return (orders as unknown as PrismaOrder[]).map((o) => this.toDomain(o));
   }
 
   async create(order: Order): Promise<Order> {
     const created = await this.prisma.order.create({
       data: {
-        status: order.status as any,
+        status: order.status as PrismaStatus,
         items: {
           create: order.items.map((i) => ({
             productId: i.productId,
@@ -56,19 +61,23 @@ export class PrismaOrderRepository implements OrderRepository {
       },
       include: { items: true },
     });
-    return new Order({
-      id: created.id,
-      status: created.status as OrderStatus,
-      items: created.items.map((i) => new OrderItem(i)),
-      createdAt: created.createdAt,
-      updatedAt: created.updatedAt,
-    });
+    return this.toDomain(created as unknown as PrismaOrder);
   }
 
   async updateStatus(id: string, status: string): Promise<void> {
     await this.prisma.order.update({
       where: { id },
-      data: { status: status as any },
+      data: { status: status as PrismaStatus },
+    });
+  }
+
+  private toDomain(raw: PrismaOrder): Order {
+    return new Order({
+      id: raw.id,
+      status: raw.status as OrderStatus,
+      items: raw.items.map((i) => new OrderItem(i)),
+      createdAt: raw.createdAt,
+      updatedAt: raw.updatedAt,
     });
   }
 }

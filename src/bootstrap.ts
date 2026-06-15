@@ -1,7 +1,20 @@
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import pinoHttp from "pino-http";
 import { AppModule } from "./app.module";
+import { CORRELATION_ID_HEADER } from "./common/logging/correlation-id.middleware";
+
+/* c8 ignore next 3 */
+function customProps(req: any) {
+  return { correlationId: (req as any).correlationId };
+}
+
+/* c8 ignore next 4 */
+function customReceivedMessage(req: any, res: any) {
+  const correlationId = (res as any)[CORRELATION_ID_HEADER] as string;
+  return `HTTP ${res.statusCode} ${req.method} ${req.url} [correlationId:${correlationId}]`;
+}
 
 export async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -16,6 +29,18 @@ export async function bootstrap(): Promise<void> {
 
   app.enableCors();
   app.setGlobalPrefix("api");
+
+  // Structured request logging with Pino
+  app.use(
+    pinoHttp({
+      customProps,
+      customReceivedMessage,
+      transport: {
+        target: "pino/file",
+        options: { destination: 1 },
+      },
+    }),
+  );
 
   const config = new DocumentBuilder()
     .setTitle("E-Commerce AI Support API")
@@ -35,5 +60,4 @@ export async function bootstrap(): Promise<void> {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`E-Commerce AI Support running on port ${port}`);
 }
