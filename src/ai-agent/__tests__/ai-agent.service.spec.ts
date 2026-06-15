@@ -903,6 +903,76 @@ describe("AiAgentService", () => {
       );
     });
 
+    it("covers orderContext ? true branch in LLM fallback path (line 172)", async () => {
+      mockLLMService.isEnabled.mockReturnValue(true);
+      mockLLMService.classifyIntent.mockResolvedValue({
+        intent: "GENERAL_HELP",
+        shouldCallTool: false,
+        confidence: 0.9,
+      });
+      mockLLMService.generateResponse.mockResolvedValue("");
+      mockOrderRepo.findById.mockResolvedValue(
+        makeOrder({
+          id: "order-with-context",
+          status: OrderStatus.PENDING,
+          items: [],
+        }),
+      );
+      service = new AiAgentService(
+        mockOrderRepo as any,
+        mockPrisma as any,
+        mockOrdersService as any,
+        mockLLMService as any,
+      );
+
+      const { response } = await service.process("hello", "order-with-context");
+      expect(response).toContain(
+        "Your order order-with-context is currently PENDING",
+      );
+    });
+
+    it("covers orderContext ? true branch in non-LLM path (line 175)", async () => {
+      mockLLMService.isEnabled.mockReturnValue(false);
+      mockOrderRepo.findById.mockResolvedValue(
+        makeOrder({
+          id: "order-with-context",
+          status: OrderStatus.PENDING,
+          items: [],
+        }),
+      );
+      service = new AiAgentService(
+        mockOrderRepo as any,
+        mockPrisma as any,
+        mockOrdersService as any,
+        mockLLMService as any,
+      );
+
+      const { response } = await service.process("help", "order-with-context");
+      expect(response).toContain(
+        "Your order order-with-context is currently PENDING",
+      );
+    });
+
+    it("covers non-Error throw in CREATE_ORDER LLM tool args path (line 318)", async () => {
+      mockLLMService.isEnabled.mockReturnValue(true);
+      mockLLMService.classifyIntent.mockResolvedValue({
+        intent: "CREATE_ORDER",
+        shouldCallTool: false,
+        confidence: 0.9,
+        toolArgs: { productId: "p1", quantity: "2", unitPrice: "10.50" },
+      });
+      mockOrderRepo.create.mockRejectedValue("string error");
+      service = new AiAgentService(
+        mockOrderRepo as any,
+        mockPrisma as any,
+        mockOrdersService as any,
+        mockLLMService as any,
+      );
+
+      const { response } = await service.process("Create an order");
+      expect(response).toContain("I couldn't create the order: Invalid data");
+    });
+
     it("covers !order false branch in cancelOrder", async () => {
       mockOrderRepo.findById.mockResolvedValue(
         makeOrder({

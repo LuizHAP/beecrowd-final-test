@@ -19,11 +19,16 @@ export async function bootstrap(): Promise<void> {
 
   const config = new DocumentBuilder()
     .setTitle("E-Commerce AI Support API")
-    .setDescription("API documentation for the E-Commerce AI Support System")
+    .setDescription(
+      "AI-powered support agent for an e-commerce platform. " +
+        "Provides order management, intent classification, RAG contextualization, " +
+        "and autonomous tool calling with prompt injection guardrails.",
+    )
     .setVersion("1.0")
-    .addTag("orders", "Order management")
-    .addTag("ai-agent", "AI Agent interactions")
-    .addTag("background-job", "Background job operations")
+    .addServer("/api", "API with global prefix")
+    .addTag("orders", "Order management — CRUD with strict state machine")
+    .addTag("ai-agent", "AI Agent — chat and observability logs")
+    .addTag("health", "Health check — database connectivity")
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup("api", app, document);
