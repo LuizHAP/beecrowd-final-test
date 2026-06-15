@@ -1,5 +1,5 @@
-import { OrderItem } from './order-item.entity';
-import { OrderStatus, isCancellable } from './order-status';
+import { OrderItem } from "./order-item.entity";
+import { OrderStatus, isCancellable } from "./order-status";
 
 export class Order {
   id: string;
@@ -28,7 +28,9 @@ export class Order {
 
   cancel(): void {
     if (!this.canCancel()) {
-      throw new Error(`Order cannot be cancelled. Current status: ${this.status}`);
+      throw new Error(
+        `Order cannot be cancelled. Current status: ${this.status}`,
+      );
     }
     this.status = OrderStatus.CANCELLED;
     this.updatedAt = new Date();

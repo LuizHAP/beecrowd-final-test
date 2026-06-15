@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
-import OpenAI from 'openai';
+import { Injectable, Logger } from "@nestjs/common";
+import OpenAI from "openai";
 
 export interface LLMIntentResult {
-  intent: 'CANCEL_ORDER' | 'CHECK_STATUS' | 'GENERAL_HELP' | 'CREATE_ORDER';
+  intent: "CANCEL_ORDER" | "CHECK_STATUS" | "GENERAL_HELP" | "CREATE_ORDER";
   orderId?: string;
   shouldCallTool: boolean;
   toolName?: string;
@@ -21,20 +21,20 @@ export interface LLMResponseResult {
 export class LLMService {
   private readonly logger = new Logger(LLMService.name);
   private openai: OpenAI | null = null;
-  private readonly model = 'gpt-4o-mini';
+  private readonly model = "gpt-4o-mini";
 
   constructor() {
     const apiKey = process.env.OPENAI_API_KEY;
     if (apiKey) {
       this.openai = new OpenAI({ apiKey });
-      this.logger.log('OpenAI client initialized');
+      this.logger.log("OpenAI client initialized");
     } else {
-      this.logger.warn('OPENAI_API_KEY not set — LLM features disabled');
+      this.logger.warn("OPENAI_API_KEY not set — LLM features disabled");
     }
   }
 
   isEnabled(): boolean {
-    return this.openai !== null && process.env.LLM_MODE === 'openai';
+    return this.openai !== null && process.env.LLM_MODE === "openai";
   }
 
   async classifyIntent(
@@ -42,7 +42,7 @@ export class LLMService {
     ragContext: string,
   ): Promise<LLMIntentResult> {
     if (!this.openai) {
-      return { intent: 'GENERAL_HELP', shouldCallTool: false, confidence: 0 };
+      return { intent: "GENERAL_HELP", shouldCallTool: false, confidence: 0 };
     }
 
     const systemPrompt = `You are an AI assistant for an e-commerce order management system. Your job is to classify user messages into intents and decide if a tool call is needed.
@@ -77,33 +77,41 @@ Return JSON:
       const completion = await this.openai.chat.completions.create({
         model: this.model,
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: message },
         ],
-        response_format: { type: 'json_schema', json_schema: {
-          name: 'intent_result',
-          schema: {
-            type: 'object',
-            properties: {
-              intent: {
-                type: 'string',
-                enum: ['CANCEL_ORDER', 'CHECK_STATUS', 'CREATE_ORDER', 'GENERAL_HELP'],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "intent_result",
+            schema: {
+              type: "object",
+              properties: {
+                intent: {
+                  type: "string",
+                  enum: [
+                    "CANCEL_ORDER",
+                    "CHECK_STATUS",
+                    "CREATE_ORDER",
+                    "GENERAL_HELP",
+                  ],
+                },
+                orderId: { type: ["string", "null"] },
+                shouldCallTool: { type: "boolean" },
+                toolName: { type: ["string", "null"] },
+                toolArgs: { type: ["object", "null"] },
+                confidence: { type: "number", minimum: 0, maximum: 1 },
               },
-              orderId: { type: ['string', 'null'] },
-              shouldCallTool: { type: 'boolean' },
-              toolName: { type: ['string', 'null'] },
-              toolArgs: { type: ['object', 'null'] },
-              confidence: { type: 'number', minimum: 0, maximum: 1 },
+              required: ["intent", "shouldCallTool", "confidence"],
+              additionalProperties: false,
             },
-            required: ['intent', 'shouldCallTool', 'confidence'],
-            additionalProperties: false,
           },
-        }},
+        },
         temperature: 0,
         max_tokens: 500,
       });
 
-      const parsed = JSON.parse(completion.choices[0].message.content ?? '{}');
+      const parsed = JSON.parse(completion.choices[0].message.content ?? "{}");
       return {
         intent: parsed.intent,
         orderId: parsed.orderId || undefined,
@@ -114,7 +122,7 @@ Return JSON:
       };
     } catch (error) {
       this.logger.error(`LLM classification failed: ${error}`);
-      return { intent: 'GENERAL_HELP', shouldCallTool: false, confidence: 0 };
+      return { intent: "GENERAL_HELP", shouldCallTool: false, confidence: 0 };
     }
   }
 
@@ -125,7 +133,7 @@ Return JSON:
     toolResult?: string,
   ): Promise<string> {
     if (!this.openai) {
-      return '';
+      return "";
     }
 
     const systemPrompt = `You are a helpful AI support agent for an e-commerce platform. Answer user questions based on the knowledge base context.
@@ -148,17 +156,17 @@ Rules:
       const completion = await this.openai.chat.completions.create({
         model: this.model,
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
         ],
         temperature: 0.7,
         max_tokens: 500,
       });
 
-      return completion.choices[0].message.content || '';
+      return completion.choices[0].message.content || "";
     } catch (error) {
       this.logger.error(`LLM response generation failed: ${error}`);
-      return 'I apologize, but I encountered an issue processing your request.';
+      return "I apologize, but I encountered an issue processing your request.";
     }
   }
 }

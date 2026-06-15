@@ -1,8 +1,19 @@
-import { Controller, Post, Get, Delete, Body, Query, Param, HttpCode, HttpStatus, ParseUUIDPipe } from '@nestjs/common';
-import { OrdersService } from './orders.service';
-import { CreateOrderDto, ListOrdersDto } from './dto';
+import {
+  Controller,
+  Post,
+  Get,
+  Delete,
+  Body,
+  Query,
+  Param,
+  HttpCode,
+  HttpStatus,
+  ParseUUIDPipe,
+} from "@nestjs/common";
+import { OrdersService } from "./orders.service";
+import { CreateOrderDto, ListOrdersDto } from "./dto";
 
-@Controller('orders')
+@Controller("orders")
 export class OrdersController {
   constructor(private ordersService: OrdersService) {}
 
@@ -17,13 +28,13 @@ export class OrdersController {
     return this.ordersService.findAll(dto);
   }
 
-  @Get(':id')
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+  @Get(":id")
+  async findOne(@Param("id", ParseUUIDPipe) id: string) {
     return this.ordersService.findOne(id);
   }
 
-  @Delete(':id')
-  async cancel(@Param('id', ParseUUIDPipe) id: string) {
+  @Delete(":id")
+  async cancel(@Param("id", ParseUUIDPipe) id: string) {
     return this.ordersService.cancel(id);
   }
 }

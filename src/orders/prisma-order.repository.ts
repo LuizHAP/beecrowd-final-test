@@ -1,9 +1,9 @@
-import { Injectable } from '@nestjs/common';
-import { OrderRepository } from '../domain/order/order.repository';
-import { Order } from '../domain/order/order.entity';
-import { OrderItem } from '../domain/order/order-item.entity';
-import { OrderStatus } from '../domain/order/order-status';
-import { PrismaService } from '../common/prisma/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { OrderRepository } from "../domain/order/order.repository";
+import { Order } from "../domain/order/order.entity";
+import { OrderItem } from "../domain/order/order-item.entity";
+import { OrderStatus } from "../domain/order/order-status";
+import { PrismaService } from "../common/prisma/prisma.service";
 
 @Injectable()
 export class PrismaOrderRepository implements OrderRepository {
@@ -28,15 +28,18 @@ export class PrismaOrderRepository implements OrderRepository {
     const orders = await this.prisma.order.findMany({
       where: status ? { status: status as any } : undefined,
       include: { items: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
-    return orders.map((o) => new Order({
-      id: o.id,
-      status: o.status as OrderStatus,
-      items: o.items.map((i) => new OrderItem(i)),
-      createdAt: o.createdAt,
-      updatedAt: o.updatedAt,
-    }));
+    return orders.map(
+      (o) =>
+        new Order({
+          id: o.id,
+          status: o.status as OrderStatus,
+          items: o.items.map((i) => new OrderItem(i)),
+          createdAt: o.createdAt,
+          updatedAt: o.updatedAt,
+        }),
+    );
   }
 
   async create(order: Order): Promise<Order> {

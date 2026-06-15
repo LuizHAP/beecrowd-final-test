@@ -1,5 +1,5 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { PrismaService } from '../common/prisma/prisma.service';
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { PrismaService } from "../common/prisma/prisma.service";
 
 @Injectable()
 export class BackgroundJobService implements OnModuleInit {
@@ -9,7 +9,7 @@ export class BackgroundJobService implements OnModuleInit {
 
   async onModuleInit() {
     // Skip scheduled job during automated tests to avoid race conditions with E2E assertions
-    if (process.env.NODE_ENV === 'test') {
+    if (process.env.NODE_ENV === "test") {
       return;
     }
     this.start();
@@ -20,9 +20,12 @@ export class BackgroundJobService implements OnModuleInit {
 
     void this.transitionPendingToProcessing();
 
-    this.intervalId = setInterval(() => {
-      void this.transitionPendingToProcessing();
-    }, 5 * 60 * 1000); // 5 minutes
+    this.intervalId = setInterval(
+      () => {
+        void this.transitionPendingToProcessing();
+      },
+      5 * 60 * 1000,
+    ); // 5 minutes
   }
 
   stop() {
@@ -32,7 +35,10 @@ export class BackgroundJobService implements OnModuleInit {
     }
   }
 
-  async transitionPendingToProcessing(): Promise<{ updated: number; error?: string }> {
+  async transitionPendingToProcessing(): Promise<{
+    updated: number;
+    error?: string;
+  }> {
     try {
       const result = await this.prisma.$executeRawUnsafe(`
         UPDATE "Order"
@@ -49,8 +55,8 @@ export class BackgroundJobService implements OnModuleInit {
       console.log(`[BACKGROUND JOB] Transited ${result} orders to PROCESSING`);
       return { updated: result };
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[BACKGROUND JOB] Error:', errorMsg);
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      console.error("[BACKGROUND JOB] Error:", errorMsg);
       return { updated: 0, error: errorMsg };
     }
   }

@@ -4,7 +4,7 @@ module.exports = {
   coverageProvider: 'v8',
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: '.',
-  testRegex: 'test/unit/.*\\.spec\\.ts$',
+  testRegex: 'src/.*\\.spec\\.ts$',
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.spec.ts',
@@ -22,8 +22,5 @@ module.exports = {
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'json-summary'],
   testEnvironment: 'node',
-  moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1',
-  },
-  setupFilesAfterEnv: ['<rootDir>/test/support/jest.setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/src/test/jest.setup.ts'],
 };
