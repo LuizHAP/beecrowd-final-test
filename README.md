@@ -12,6 +12,7 @@ A NestJS backend application that provides an AI-powered support agent for an e-
 - [Testing](#testing)
 - [Project Structure](#project-structure)
 - [AI Agent](#ai-agent)
+- [Documentation](#documentation)
 
 ## Architecture
 
@@ -175,15 +176,15 @@ The AI support agent (`/api/ai/chat`) implements:
 - Prompt injection detection runs before any LLM processing
 - AI log failures are handled silently to avoid breaking the main flow
 
-## NestJS vs Next.js
+## Documentation
 
-This implementation uses **NestJS** instead of Next.js for the following reasons:
+All project documentation is located in the [`docs/`](docs/) directory:
 
-- **Backend-first architecture**: Requirements describe a "legacy microservice" — NestJS is purpose-built for backend microservices
-- **Better OpenAPI/Swagger support**: `@nestjs/swagger` provides automatic, type-safe API documentation
-- **Background job support**: Native scheduling capabilities
-- **TypeScript-native**: Full type safety with the same core competency evaluation
-
----
+| Document | Description |
+|----------|-------------|
+| [Programming Test Final](docs/PROGRAMMING_TEST_FINAL.md) | Full test specification and requirements |
+| [Implementation Checklist](docs/CHECKLIST.md) | Complete implementation status per requirement |
+| [GenAI Report](docs/GENAI_REPORT.md) | AI-assisted development log — tools, prompts, failures, and corrections |
+| [OpenAPI Specification](docs/swagger.json) | Exported Swagger 3.0 schema for all API endpoints |
 
 > **Note:** Docker PostgreSQL is exposed on host port **5433** to avoid conflicts with local Postgres installations on port 5432.

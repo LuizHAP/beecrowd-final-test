@@ -17,7 +17,7 @@
     "test:debug": "node --inspect-brk node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
     "test:all": "npm test && npm run test:e2e",
-    "swagger:export": "bash scripts/export-swagger.sh",
+    "swagger:export": "node scripts/export-swagger.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev --name init",
     "docker:up": "docker compose up -d",
