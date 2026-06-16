@@ -27,8 +27,6 @@ A NestJS backend application that provides an AI-powered support agent for an e-
 │  │  /api/ai/logs    │    │                          │   │
 │  │  /api/health     │    │                          │   │
 │  │                  │    │                          │   │
-│  │  Background Job  │    │                          │   │
-│  │  (SKIP LOCKED)   │    │                          │   │
 │  └──────────────────┘    └──────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -39,7 +37,6 @@ The system follows **Domain-Driven Design (DDD)** and **SOLID principles** with 
 
 - **Order Management** — Full CRUD with strict state machine (PENDING → PROCESSING → SHIPPED → DELIVERED)
 - **AI Support Agent** — Intent classification, RAG contextualization, tool calling, and prompt injection guardrails
-- **Background Jobs** — Distributed order processing with `SELECT ... FOR UPDATE SKIP LOCKED`
 - **LLM Integration** — Pluggable LLM service with observability logging
 - **Swagger/OpenAPI** — Auto-generated API documentation
 - **100% Test Coverage** — Unit and E2E tests with Jest
@@ -68,7 +65,7 @@ The system follows **Domain-Driven Design (DDD)** and **SOLID principles** with 
 
 ```bash
 # Install dependencies
-npm install
+yarn install
 
 # Copy environment variables
 cp .env.example .env
@@ -77,20 +74,20 @@ cp .env.example .env
 docker compose up -d
 
 # Run migrations (if any)
-npx prisma generate
+yarn prisma generate
 ```
 
 ### Development
 
 ```bash
 # Start in watch mode
-npm run start:dev
+yarn start:dev
 
 # Build for production
-npm run build
+yarn build
 
 # Start production server
-npm run start:prod
+yarn start:prod
 ```
 
 ## API Endpoints
@@ -111,16 +108,16 @@ Swagger UI is available at `/api` when the server is running.
 
 ```bash
 # Run unit tests
-npm run test
+yarn test
 
 # Run unit tests with coverage
-npm run test:cov
+yarn test:cov
 
 # Run E2E tests
-npm run test:e2e
+yarn test:e2e
 
 # Run all tests
-npm run test:all
+yarn test:all
 ```
 
 ### Test Coverage
@@ -129,7 +126,6 @@ npm run test:all
 |-----------|----------|
 | Orders | 100% |
 | AI Agent | 100% |
-| Background Job | 100% |
 | LLM Service | 100% |
 | **Overall** | **100%** |
 
@@ -144,7 +140,6 @@ src/
 │   ├── ai-agent.module.ts
 │   ├── dto/           # Data transfer objects
 │   └── entities/      # Domain entities
-├── background-job/    # Background job processing
 ├── common/            # Shared modules
 │   ├── health/        # Health check
 │   └── prisma/        # Prisma ORM module
