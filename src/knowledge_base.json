@@ -1,0 +1,34 @@
+[
+  {
+    "context": "Order Cancellations",
+    "rule": "Order cancellation is a consumer right applicable only as long as the internal status of the order is listed as PENDING in the database. If the order has progressed to PROCESSING, SHIPPED or DELIVERED, the automated support is strictly forbidden to carry out the operation."
+  },
+  {
+    "context": "Update Window",
+    "rule": "New orders enter the PENDING state and wait for payment validation. A background process transitions orders to PROCESSING rigidly every 5 minutes."
+  },
+  {
+    "context": "Order Tracking",
+    "rule": "Orders in PROCESSING status are being prepared for shipment. Customers can check the status of their order at any time through the support channel or their account dashboard."
+  },
+  {
+    "context": "Shipping Process",
+    "rule": "Once an order leaves the warehouse, its status changes to SHIPPED. A tracking code is generated and made available to the customer. Shipping times vary based on the destination region."
+  },
+  {
+    "context": "Delivery Confirmation",
+    "rule": "When the carrier confirms delivery, the order status changes to DELIVERED. In case of delivery issues, the customer has up to 7 days to open a dispute through the support channel."
+  },
+  {
+    "context": "Returns and Refunds",
+    "rule": "According to consumer protection laws, customers have up to 7 days after receiving a product to request a return for any reason. Products in transit or not yet delivered cannot be returned — the order must first be cancelled (if PENDING) or the delivery must be completed and then a return initiated."
+  },
+  {
+    "context": "Order Creation",
+    "rule": "Orders are created with a PENDING status and must contain at least one item with a valid product ID, a positive quantity, and a non-negative unit price. The total order value is calculated as the sum of all item subtotals (quantity × unit price)."
+  },
+  {
+    "context": "Payment Validation",
+    "rule": "New orders remain in PENDING status until payment is validated. The background job that transitions orders to PROCESSING runs every 5 minutes, but only processes orders that are still in PENDING status after payment validation."
+  }
+]

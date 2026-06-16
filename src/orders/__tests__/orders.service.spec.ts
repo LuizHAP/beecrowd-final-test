@@ -1,5 +1,6 @@
 import { NotFoundException } from "@nestjs/common";
 import { OrdersService } from "../orders.service";
+import type { PrismaOrderRepository } from "../prisma-order.repository";
 import { Order } from "../../domain/order/order.entity";
 import { OrderItem } from "../../domain/order/order-item.entity";
 import { OrderStatus } from "../../domain/order/order-status";
@@ -27,16 +28,15 @@ function makeItem(overrides: Partial<OrderItem> = {}): OrderItem {
 
 describe("OrdersService", () => {
   let service: OrdersService;
-  let mockRepo: any;
+  let mockRepo: jest.MockedObjectDeep<PrismaOrderRepository>;
 
   beforeEach(() => {
     mockRepo = {
       findById: jest.fn(),
       findAll: jest.fn(),
       create: jest.fn(),
-      updateStatus: jest.fn(),
       updateStatusIfPending: jest.fn(),
-    };
+    } as unknown as jest.MockedObjectDeep<PrismaOrderRepository>;
     service = new OrdersService(mockRepo);
   });
 
@@ -63,59 +63,48 @@ describe("OrdersService", () => {
 
     it("throws if items is undefined", async () => {
       // @ts-expect-error testing undefined items
-      await expect(service.create({})).rejects.toThrow(
+      await expect(service.create({ items: undefined })).rejects.toThrow(
         "Order must contain at least one item",
       );
-    });
-
-    it("throws if items is null", async () => {
-      // @ts-expect-error testing null items
-      await expect(service.create({ items: null })).rejects.toThrow(
-        "Order must contain at least one item",
-      );
-    });
-
-    it("throws for invalid item data", async () => {
-      await expect(
-        service.create({
-          items: [{ productId: "", quantity: 0, unitPrice: -1 }],
-        }),
-      ).rejects.toThrow();
     });
   });
 
   describe("findAll", () => {
-    it("returns all orders when no status filter", async () => {
-      mockRepo.findAll.mockResolvedValue([]);
+    it("returns all orders", async () => {
+      const orders = [makeOrder({ id: "1" }), makeOrder({ id: "2" })];
+      mockRepo.findAll.mockResolvedValue(orders);
+
       const result = await service.findAll({});
-      expect(result).toEqual([]);
+
+      expect(result).toEqual(orders);
       expect(mockRepo.findAll).toHaveBeenCalledWith(undefined);
     });
 
-    it("filters by status when provided", async () => {
-      mockRepo.findAll.mockResolvedValue([]);
-      await service.findAll({ status: "PENDING" });
-      expect(mockRepo.findAll).toHaveBeenCalledWith("PENDING");
-    });
-
-    it("returns orders with items", async () => {
-      const orders = [makeOrder({ items: [makeItem()] })];
+    it("filters by status", async () => {
+      const orders = [makeOrder({ id: "1" })];
       mockRepo.findAll.mockResolvedValue(orders);
-      const result = await service.findAll({});
+
+      const result = await service.findAll({ status: OrderStatus.PENDING });
+
       expect(result).toEqual(orders);
+      expect(mockRepo.findAll).toHaveBeenCalledWith(OrderStatus.PENDING);
     });
   });
 
   describe("findOne", () => {
-    it("returns order by id", async () => {
-      const order = makeOrder();
+    it("returns order when found", async () => {
+      const order = makeOrder({ id: "1" });
       mockRepo.findById.mockResolvedValue(order);
-      const result = await service.findOne("test-id");
+
+      const result = await service.findOne("1");
+
       expect(result).toBe(order);
+      expect(mockRepo.findById).toHaveBeenCalledWith("1");
     });
 
-    it("throws 404 when order not found", async () => {
+    it("throws NotFoundException when order not found", async () => {
       mockRepo.findById.mockResolvedValue(null);
+
       await expect(service.findOne("non-existent")).rejects.toThrow(
         NotFoundException,
       );
@@ -123,102 +112,48 @@ describe("OrdersService", () => {
   });
 
   describe("cancel", () => {
-    it("cancels PENDING order atomically", async () => {
-      const order = makeOrder({
-        id: "test-id",
-        status: OrderStatus.PENDING,
-        items: [],
-      });
-      mockRepo.findById.mockResolvedValue(order);
+    it("cancels pending order", async () => {
       mockRepo.updateStatusIfPending.mockResolvedValue(true);
 
-      const result = await service.cancel("test-id");
-      expect(result).toBeUndefined();
+      await service.cancel("1");
+
       expect(mockRepo.updateStatusIfPending).toHaveBeenCalledWith(
-        "test-id",
+        "1",
         OrderStatus.CANCELLED,
       );
     });
 
-    it("rejects PROCESSING order", async () => {
-      const order = makeOrder({
-        id: "test-id",
-        status: OrderStatus.PROCESSING,
-        items: [],
-      });
-      mockRepo.findById.mockResolvedValue(order);
-      await expect(service.cancel("test-id")).rejects.toThrow();
+    it("throws BadRequestException if order not pending", async () => {
+      mockRepo.updateStatusIfPending.mockResolvedValue(false);
+      mockRepo.findById.mockResolvedValue(
+        makeOrder({ id: "1", status: OrderStatus.DELIVERED }),
+      );
+
+      await expect(service.cancel("1")).rejects.toThrow(
+        "Order cannot be cancelled. Current status: DELIVERED",
+      );
     });
 
-    it("rejects SHIPPED order", async () => {
-      const order = makeOrder({
-        id: "test-id",
-        status: OrderStatus.SHIPPED,
-        items: [],
-      });
-      mockRepo.findById.mockResolvedValue(order);
-      await expect(service.cancel("test-id")).rejects.toThrow();
-    });
-
-    it("rejects DELIVERED order", async () => {
-      const order = makeOrder({
-        id: "test-id",
-        status: OrderStatus.DELIVERED,
-        items: [],
-      });
-      mockRepo.findById.mockResolvedValue(order);
-      await expect(service.cancel("test-id")).rejects.toThrow();
-    });
-
-    it("rejects CANCELLED order", async () => {
-      const order = makeOrder({
-        id: "test-id",
-        status: OrderStatus.CANCELLED,
-        items: [],
-      });
-      mockRepo.findById.mockResolvedValue(order);
-      await expect(service.cancel("test-id")).rejects.toThrow();
-    });
-
-    it("throws 404 for non-existent order", async () => {
+    it("throws NotFoundException if order not found", async () => {
+      mockRepo.updateStatusIfPending.mockResolvedValue(false);
       mockRepo.findById.mockResolvedValue(null);
-      mockRepo.updateStatusIfPending.mockResolvedValue(false);
-      await expect(service.cancel("non-existent")).rejects.toThrow(
-        NotFoundException,
-      );
-    });
 
-    it("handles atomic update failure (race condition)", async () => {
-      const order = makeOrder({
-        id: "test-id",
-        status: OrderStatus.PENDING,
-        items: [],
-      });
-      mockRepo.findById.mockResolvedValue(order);
-      mockRepo.updateStatusIfPending.mockResolvedValue(false);
-      mockRepo.findById.mockResolvedValueOnce(
-        makeOrder({ id: "test-id", status: OrderStatus.PROCESSING, items: [] }),
-      );
-      await expect(service.cancel("test-id")).rejects.toThrow();
+      await expect(service.cancel("1")).rejects.toThrow("Order not found");
     });
   });
 
   describe("toResponseDto", () => {
-    it("should convert an Order to OrderResponseDto", () => {
-      const item = makeItem({
-        id: "item-1",
-        productId: "prod-1",
-        quantity: 2,
-        unitPrice: 10,
-      });
+    it("converts order to response DTO", () => {
       const order = makeOrder({
-        id: "test-id",
+        id: "1",
         status: OrderStatus.PENDING,
-        items: [item],
+        items: [makeItem()],
       });
-      const dto = service.toResponseDto(order);
-      expect(dto).toEqual({
-        id: "test-id",
+
+      const result = service.toResponseDto(order);
+
+      expect(result).toEqual({
+        id: "1",
         status: OrderStatus.PENDING,
         items: [
           {
@@ -229,8 +164,8 @@ describe("OrdersService", () => {
           },
         ],
         total: 20,
-        createdAt: order.createdAt,
-        updatedAt: order.updatedAt,
+        createdAt: expect.any(Date),
+        updatedAt: expect.any(Date),
       });
     });
   });

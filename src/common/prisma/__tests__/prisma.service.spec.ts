@@ -1,10 +1,10 @@
 import { PrismaService } from "../prisma.service";
 
 jest.mock("@prisma/client", () => ({
-  PrismaClient: jest.fn().mockImplementation(function () {
-    this.$connect = jest.fn().mockResolvedValue(undefined);
-    this.$disconnect = jest.fn().mockResolvedValue(undefined);
-  }),
+  PrismaClient: class MockPrismaClient {
+    $connect = jest.fn().mockResolvedValue(undefined);
+    $disconnect = jest.fn().mockResolvedValue(undefined);
+  },
 }));
 
 describe("PrismaService", () => {

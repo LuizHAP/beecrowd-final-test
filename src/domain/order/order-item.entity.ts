@@ -1,8 +1,8 @@
 export class OrderItem {
-  id: string;
-  productId: string;
-  quantity: number;
-  unitPrice: number;
+  declare readonly id: string;
+  declare readonly productId: string;
+  declare readonly quantity: number;
+  declare readonly unitPrice: number;
 
   constructor(data: {
     id: string;

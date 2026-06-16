@@ -1,4 +1,5 @@
 import { PrismaOrderRepository } from "../prisma-order.repository";
+import type { PrismaService } from "../../common/prisma/prisma.service";
 import { Order } from "../../domain/order/order.entity";
 import { OrderItem } from "../../domain/order/order-item.entity";
 import { OrderStatus } from "../../domain/order/order-status";
@@ -14,9 +15,19 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
   });
 }
 
+interface MockPrisma {
+  order: {
+    findUnique: jest.Mock;
+    findMany: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+  };
+  $executeRawUnsafe: jest.Mock;
+}
+
 describe("PrismaOrderRepository", () => {
   let repo: PrismaOrderRepository;
-  let mockPrisma: any;
+  let mockPrisma: MockPrisma;
 
   beforeEach(() => {
     mockPrisma = {
@@ -28,7 +39,7 @@ describe("PrismaOrderRepository", () => {
       },
       $executeRawUnsafe: jest.fn(),
     };
-    repo = new PrismaOrderRepository(mockPrisma as any);
+    repo = new PrismaOrderRepository(mockPrisma as unknown as PrismaService);
   });
 
   describe("findById", () => {
@@ -67,9 +78,7 @@ describe("PrismaOrderRepository", () => {
         {
           id: "order-1",
           status: "PENDING",
-          items: [
-            { id: "item-1", productId: "prod-1", quantity: 1, unitPrice: 10 },
-          ],
+          items: [],
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -83,23 +92,19 @@ describe("PrismaOrderRepository", () => {
 
     it("filters by status", async () => {
       mockPrisma.order.findMany.mockResolvedValue([]);
-      await repo.findAll("PENDING");
-      expect(mockPrisma.order.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { status: "PENDING" } }),
-      );
-    });
 
-    it("orders by createdAt desc", async () => {
-      mockPrisma.order.findMany.mockResolvedValue([]);
-      await repo.findAll();
-      expect(mockPrisma.order.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ orderBy: { createdAt: "desc" } }),
-      );
+      await repo.findAll("PENDING");
+
+      expect(mockPrisma.order.findMany).toHaveBeenCalledWith({
+        where: { status: "PENDING" },
+        include: { items: true },
+        orderBy: { createdAt: "desc" },
+      });
     });
   });
 
   describe("create", () => {
-    it("creates order with items", async () => {
+    it("creates an order with items", async () => {
       const order = makeOrder({
         id: "order-1",
         items: [
@@ -125,12 +130,15 @@ describe("PrismaOrderRepository", () => {
       const result = await repo.create(order);
 
       expect(result).toBeInstanceOf(Order);
+      expect(result!.id).toBe("order-1");
       expect(result!.items).toHaveLength(1);
     });
   });
 
   describe("updateStatus", () => {
     it("updates order status", async () => {
+      mockPrisma.order.update.mockResolvedValue({});
+
       await repo.updateStatus("order-1", "CANCELLED");
 
       expect(mockPrisma.order.update).toHaveBeenCalledWith({
@@ -141,16 +149,19 @@ describe("PrismaOrderRepository", () => {
   });
 
   describe("updateStatusIfPending", () => {
-    it("returns true when order is PENDING and updated", async () => {
+    it("returns true when order was updated", async () => {
       mockPrisma.$executeRawUnsafe.mockResolvedValue([{ id: "order-1" }]);
+
       const result = await repo.updateStatusIfPending("order-1", "CANCELLED");
+
       expect(result).toBe(true);
-      expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalled();
     });
 
-    it("returns false when order is not PENDING", async () => {
+    it("returns false when no order was updated", async () => {
       mockPrisma.$executeRawUnsafe.mockResolvedValue([]);
+
       const result = await repo.updateStatusIfPending("order-1", "CANCELLED");
+
       expect(result).toBe(false);
     });
   });

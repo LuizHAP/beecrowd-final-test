@@ -12,15 +12,15 @@ import {
 
 export class CreateItemDto {
   @IsString()
-  productId: string;
+  productId!: string;
 
   @IsInt()
   @Min(1)
-  quantity: number;
+  quantity!: number;
 
   @IsNumber()
   @Min(0)
-  unitPrice: number;
+  unitPrice!: number;
 }
 
 export class CreateOrderDto {
@@ -28,7 +28,7 @@ export class CreateOrderDto {
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CreateItemDto)
-  items: CreateItemDto[];
+  items!: CreateItemDto[];
 }
 
 export class ListOrdersDto {

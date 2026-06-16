@@ -3,7 +3,7 @@ import pino, { Logger as PinoLogger } from "pino";
 
 @Injectable()
 export class LoggingService implements LoggerService {
-  private logger: PinoLogger;
+  private logger!: PinoLogger;
 
   constructor() {
     this.logger = pino({
@@ -13,9 +13,7 @@ export class LoggingService implements LoggerService {
 
   child(context: string, _bindings?: Record<string, unknown>): LoggingService {
     const child = new LoggingService();
-    (child as any).logger = this.logger.child({
-      context: context ?? "unknown",
-    });
+    child.logger = this.logger.child({ context: context ?? "unknown" });
     return child;
   }
 

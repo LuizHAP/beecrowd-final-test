@@ -1,9 +1,16 @@
 import { OrdersController } from "../orders.controller";
 import { CreateOrderDto, ListOrdersDto } from "../dto";
 
+interface MockOrdersService {
+  create: jest.Mock;
+  findAll: jest.Mock;
+  findOne: jest.Mock;
+  cancel: jest.Mock;
+}
+
 describe("OrdersController", () => {
   let controller: OrdersController;
-  let mockService: any;
+  let mockService: MockOrdersService;
 
   beforeEach(() => {
     mockService = {
@@ -12,7 +19,7 @@ describe("OrdersController", () => {
       findOne: jest.fn(),
       cancel: jest.fn(),
     };
-    controller = new OrdersController(mockService);
+    controller = new OrdersController(mockService as never);
   });
 
   describe("create", () => {
@@ -39,39 +46,23 @@ describe("OrdersController", () => {
 
   describe("findAll", () => {
     it("delegates to ordersService.findAll with no filters", async () => {
-      const mockResult: Array<{
-        id: string;
-        status: string;
-        items: any[];
-        total: number;
-        createdAt: Date;
-        updatedAt: Date;
-      }> = [];
-      mockService.findAll.mockResolvedValue(mockResult);
+      mockService.findAll.mockResolvedValue([]);
 
       const dto: ListOrdersDto = {};
       const result = await controller.findAll(dto);
 
       expect(mockService.findAll).toHaveBeenCalledWith(dto);
-      expect(result).toEqual(mockResult);
+      expect(result).toEqual([]);
     });
 
     it("delegates to ordersService.findAll with status filter", async () => {
-      const mockResult: Array<{
-        id: string;
-        status: string;
-        items: any[];
-        total: number;
-        createdAt: Date;
-        updatedAt: Date;
-      }> = [];
-      mockService.findAll.mockResolvedValue(mockResult);
+      mockService.findAll.mockResolvedValue([]);
 
       const dto: ListOrdersDto = { status: "PENDING" };
       const result = await controller.findAll(dto);
 
       expect(mockService.findAll).toHaveBeenCalledWith(dto);
-      expect(result).toEqual(mockResult);
+      expect(result).toEqual([]);
     });
   });
 

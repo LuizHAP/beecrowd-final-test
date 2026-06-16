@@ -24,8 +24,8 @@ describe("CreateOrderDto", () => {
     ];
 
     expect(dto.items).toHaveLength(2);
-    expect(dto.items[0].productId).toBe("prod-1");
-    expect(dto.items[1].quantity).toBe(3);
+    expect(dto.items?.[0]?.productId).toBe("prod-1");
+    expect(dto.items?.[1]?.quantity).toBe(3);
   });
 
   it("validates nested items via class-transformer", async () => {

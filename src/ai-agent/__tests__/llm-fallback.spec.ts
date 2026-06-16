@@ -1,3 +1,5 @@
+import type { LoggingService } from "../../common/logging/logging.service";
+
 const fallbackMockState: { content: string | null; fail: boolean } = {
   content: "Test response",
   fail: false,
@@ -6,7 +8,11 @@ const fallbackMockState: { content: string | null; fail: boolean } = {
 jest.mock("openai", () => ({
   __esModule: true,
   default: class MockOpenAI {
-    chat: any;
+    chat: {
+      completions: {
+        create: jest.Mock;
+      };
+    };
     constructor() {
       this.chat = {
         completions: {
@@ -30,7 +36,7 @@ const fallbackMockLoggingService = {
   error: jest.fn(),
   debug: jest.fn(),
   log: jest.fn(),
-};
+} as unknown as LoggingService;
 
 describe("LLMService fallback paths", () => {
   afterEach(() => {
@@ -48,7 +54,7 @@ describe("LLMService fallback paths", () => {
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { LLMService } = require("../llm.service");
-    const svc = new LLMService(fallbackMockLoggingService as any);
+    const svc = new LLMService(fallbackMockLoggingService);
 
     const result = await svc.classifyIntent("cancel order");
     expect(result.intent).toBe("GENERAL_HELP");
@@ -63,9 +69,39 @@ describe("LLMService fallback paths", () => {
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { LLMService } = require("../llm.service");
-    const svc = new LLMService(fallbackMockLoggingService as any);
+    const svc = new LLMService(fallbackMockLoggingService);
 
-    const result = await svc.generateResponse("system prompt", "hello");
-    expect(result).toContain("No response generated.");
+    const result = await svc.generateResponse("test", "context");
+    expect(result).toBe("No response generated.");
+  });
+
+  it("should handle API errors in classifyIntent", async () => {
+    process.env.OPENAI_API_KEY = "test-key";
+    process.env.LLM_MODE = "openai";
+    fallbackMockState.fail = true;
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { LLMService } = require("../llm.service");
+    const svc = new LLMService(fallbackMockLoggingService);
+
+    const result = await svc.classifyIntent("cancel order");
+    expect(result.intent).toBe("GENERAL_HELP");
+    expect(result.shouldCallTool).toBe(false);
+    expect(result.confidence).toBe(0);
+  });
+
+  it("should handle API errors in generateResponse", async () => {
+    process.env.OPENAI_API_KEY = "test-key";
+    process.env.LLM_MODE = "openai";
+    fallbackMockState.fail = true;
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { LLMService } = require("../llm.service");
+    const svc = new LLMService(fallbackMockLoggingService);
+
+    const result = await svc.generateResponse("test", "context");
+    expect(result).toBe(
+      "I'm sorry, I can only help with order-related questions.",
+    );
   });
 });

@@ -9,6 +9,8 @@ import knowledgeBase from "../../knowledge_base.json";
 import { LLMService, IntentClassification } from "./llm.service";
 
 export interface AILogEntry {
+  id: string;
+  orderId: string | null;
   intent: "CANCEL_ORDER" | "CHECK_STATUS" | "GENERAL_HELP" | "CREATE_ORDER";
   model: string;
   tokensUsed: number;
@@ -16,8 +18,9 @@ export interface AILogEntry {
   toolCalled: "CANCEL_ORDER" | null;
   toolSuccess: boolean | null;
   promptInjectionDetected: boolean;
-  rawInput?: string;
-  rawOutput?: string;
+  rawInput: string | null;
+  rawOutput: string | null;
+  timestamp: Date;
 }
 
 @Injectable()
@@ -59,6 +62,8 @@ export class AiAgentService {
     }
 
     const log: AILogEntry = {
+      id: "",
+      orderId: null,
       intent,
       model: this.llmService.isEnabled()
         ? "gpt-4o-mini"
@@ -69,7 +74,8 @@ export class AiAgentService {
       toolSuccess: null,
       promptInjectionDetected,
       rawInput: message,
-      rawOutput: "",
+      rawOutput: null,
+      timestamp: new Date(),
     };
 
     if (promptInjectionDetected) {
@@ -168,16 +174,38 @@ export class AiAgentService {
     return { response: responseText, log };
   }
 
-  async getLogs(limit = 50, intent?: string, injection?: boolean) {
-    const where: Record<string, unknown> = {};
-    if (intent) where.intent = intent;
+  async getLogs(
+    limit = 50,
+    intent?: string,
+    injection?: boolean,
+  ): Promise<AILogEntry[]> {
+    const where: {
+      intent?: AILogEntry["intent"];
+      promptInjectionDetected?: boolean;
+    } = {};
+    if (intent) where.intent = intent as AILogEntry["intent"];
     if (injection !== undefined) where.promptInjectionDetected = injection;
 
-    return this.prisma.aILog.findMany({
+    const logs = await this.prisma.aILog.findMany({
       where,
       orderBy: { timestamp: "desc" },
       take: Math.min(limit, 100),
     });
+
+    return logs.map((log) => ({
+      id: log.id,
+      orderId: log.orderId,
+      intent: log.intent as AILogEntry["intent"],
+      model: log.model,
+      tokensUsed: log.tokensUsed,
+      responseTimeMs: log.responseTimeMs,
+      toolCalled: log.toolCalled as AILogEntry["toolCalled"],
+      toolSuccess: log.toolSuccess,
+      promptInjectionDetected: log.promptInjectionDetected,
+      rawInput: log.rawInput,
+      rawOutput: log.rawOutput,
+      timestamp: log.timestamp,
+    }));
   }
 
   private detectPromptInjection(message: string): boolean {
@@ -205,14 +233,18 @@ export class AiAgentService {
   }
 
   private buildRAGContext(intent: string): string {
-    const relevantRules = knowledgeBase.filter((kb) => {
+    const relevantRules = knowledgeBase.filter((kb: { context: string }) => {
       const lower = kb.context.toLowerCase();
       if (intent === "CANCEL_ORDER") return lower.includes("cancel");
       if (intent === "CHECK_STATUS")
         return lower.includes("status") || lower.includes("update");
       return true;
     });
-    return relevantRules.map((kb) => `[${kb.context}] ${kb.rule}`).join("\n\n");
+    return relevantRules
+      .map(
+        (kb: { context: string; rule: string }) => `[${kb.context}] ${kb.rule}`,
+      )
+      .join("\n\n");
   }
 
   private async getOrderContext(orderId: string): Promise<Order | null> {
@@ -284,10 +316,13 @@ export class AiAgentService {
       };
     }
 
+    const prodId = productIdMatch![1] as string;
+    const qty = quantityMatch![1] as string;
+    const price = priceMatch![1] as string;
     return this.createFromArgs({
-      productId: productIdMatch[1],
-      quantity: quantityMatch[1],
-      unitPrice: priceMatch[1],
+      productId: prodId,
+      quantity: qty,
+      unitPrice: price,
     });
   }
 
@@ -315,9 +350,9 @@ export class AiAgentService {
       const orderItems = [
         new OrderItem({
           id: "",
-          productId: dto.items[0].productId,
-          quantity: dto.items[0].quantity,
-          unitPrice: dto.items[0].unitPrice,
+          productId: dto.items[0]!.productId,
+          quantity: dto.items[0]!.quantity,
+          unitPrice: dto.items[0]!.unitPrice,
         }),
       ];
 

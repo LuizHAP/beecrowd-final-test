@@ -3,7 +3,7 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY package.json yarn.lock ./
 RUN npm ci
 
 COPY prisma ./prisma
@@ -20,7 +20,7 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY package.json yarn.lock ./
 RUN npm ci --omit=dev
 
 COPY --from=builder /app/prisma ./prisma
