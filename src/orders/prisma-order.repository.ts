@@ -71,6 +71,15 @@ export class PrismaOrderRepository implements OrderRepository {
     });
   }
 
+  async updateStatusIfPending(id: string, newStatus: string): Promise<boolean> {
+    const result = await this.prisma.$executeRawUnsafe(
+      `UPDATE "Order" SET status = $2, "updatedAt" = NOW() WHERE id = $1 AND status = 'PENDING' RETURNING id`,
+      id,
+      newStatus as PrismaStatus,
+    );
+    return (result as unknown as Array<{ id: string }>).length > 0;
+  }
+
   private toDomain(raw: PrismaOrder): Order {
     return new Order({
       id: raw.id,

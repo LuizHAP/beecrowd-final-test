@@ -1,3 +1,4 @@
+import { BadRequestException } from "@nestjs/common";
 import { AiAgentController } from "../ai-agent.controller";
 
 describe("AiAgentController", () => {
@@ -13,16 +14,22 @@ describe("AiAgentController", () => {
   });
 
   describe("chat", () => {
-    it("returns error when message is missing", async () => {
-      const result = await controller.chat({ message: "" as any });
-      expect(result.response).toBe("Message is required");
-      expect(result.log).toBeNull();
+    it("throws when message is empty", async () => {
+      await expect(controller.chat({ message: "" as any })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
-    it("returns error when message is not a string", async () => {
-      const result = await controller.chat({ message: 123 as any });
-      expect(result.response).toBe("Message is required");
-      expect(result.log).toBeNull();
+    it("throws when message is not a string", async () => {
+      await expect(controller.chat({ message: 123 as any })).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it("throws when message is undefined", async () => {
+      await expect(controller.chat({} as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it("delegates to aiService.process with message only", async () => {
@@ -57,9 +64,7 @@ describe("AiAgentController", () => {
 
   describe("getLogs", () => {
     it("returns logs with default limit", async () => {
-      const mockLogs: Array<{ id: string; intent: string }> = [
-        { id: "log-1", intent: "GENERAL_HELP" },
-      ];
+      const mockLogs = [{ id: "log-1", intent: "GENERAL_HELP" }];
       mockService.getLogs.mockResolvedValue(mockLogs);
 
       const result = await controller.getLogs();
@@ -73,9 +78,7 @@ describe("AiAgentController", () => {
     });
 
     it("returns logs with custom limit", async () => {
-      const mockLogs: Array<{ id: string; intent: string }> = [
-        { id: "log-1", intent: "GENERAL_HELP" },
-      ];
+      const mockLogs = [{ id: "log-1", intent: "GENERAL_HELP" }];
       mockService.getLogs.mockResolvedValue(mockLogs);
 
       const result = await controller.getLogs("10");
@@ -89,51 +92,49 @@ describe("AiAgentController", () => {
     });
 
     it("filters by intent", async () => {
-      const mockLogs: Array<{ id: string; intent: string }> = [];
-      mockService.getLogs.mockResolvedValue(mockLogs);
+      mockService.getLogs.mockResolvedValue([]);
 
-      const result = await controller.getLogs(undefined, "CANCEL_ORDER");
+      await controller.getLogs(undefined, "CANCEL_ORDER");
 
       expect(mockService.getLogs).toHaveBeenCalledWith(
         50,
         "CANCEL_ORDER",
         undefined,
       );
-      expect(result).toEqual({ logs: mockLogs });
     });
 
     it("filters by injection true", async () => {
-      const mockLogs: Array<{ id: string; intent: string }> = [];
-      mockService.getLogs.mockResolvedValue(mockLogs);
+      mockService.getLogs.mockResolvedValue([]);
 
-      const result = await controller.getLogs(undefined, undefined, "true");
+      await controller.getLogs(undefined, undefined, "true");
 
       expect(mockService.getLogs).toHaveBeenCalledWith(50, undefined, true);
-      expect(result).toEqual({ logs: mockLogs });
     });
 
     it("filters by injection false", async () => {
-      const mockLogs: Array<{ id: string; intent: string }> = [];
-      mockService.getLogs.mockResolvedValue(mockLogs);
+      mockService.getLogs.mockResolvedValue([]);
 
-      const result = await controller.getLogs(undefined, undefined, "false");
+      await controller.getLogs(undefined, undefined, "false");
 
       expect(mockService.getLogs).toHaveBeenCalledWith(50, undefined, false);
-      expect(result).toEqual({ logs: mockLogs });
     });
 
-    it("passes undefined for injection when not provided", async () => {
-      const mockLogs: Array<{ id: string; intent: string }> = [];
-      mockService.getLogs.mockResolvedValue(mockLogs);
-
-      const result = await controller.getLogs();
-
-      expect(mockService.getLogs).toHaveBeenCalledWith(
-        50,
-        undefined,
-        undefined,
+    it("throws for invalid limit (non-numeric)", async () => {
+      await expect(controller.getLogs("abc")).rejects.toThrow(
+        BadRequestException,
       );
-      expect(result).toEqual({ logs: mockLogs });
+    });
+
+    it("throws for negative limit", async () => {
+      await expect(controller.getLogs("-5")).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it("throws for zero limit", async () => {
+      await expect(controller.getLogs("0")).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 });

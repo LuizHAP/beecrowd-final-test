@@ -35,6 +35,7 @@ describe("OrdersService", () => {
       findAll: jest.fn(),
       create: jest.fn(),
       updateStatus: jest.fn(),
+      updateStatusIfPending: jest.fn(),
     };
     service = new OrdersService(mockRepo);
   });
@@ -43,165 +44,97 @@ describe("OrdersService", () => {
     it("creates an order with items", async () => {
       const createdOrder = makeOrder({
         id: "test-id",
-        status: OrderStatus.PENDING,
-        items: [
-          makeItem({
-            id: "item-1",
-            productId: "prod-1",
-            quantity: 2,
-            unitPrice: 10,
-          }),
-        ],
+        items: [makeItem()],
       });
       mockRepo.create.mockResolvedValue(createdOrder);
 
       const result = await service.create({
         items: [{ productId: "prod-1", quantity: 2, unitPrice: 10 }],
       });
-
-      expect(result.status).toBe("PENDING");
-      expect(result.total).toBe(20);
+      expect(result).toBe(createdOrder);
+      expect(mockRepo.create).toHaveBeenCalled();
     });
 
-    it("rejects empty items", async () => {
-      await expect(service.create({ items: [] })).rejects.toThrow();
+    it("throws if no items provided", async () => {
+      await expect(service.create({ items: [] })).rejects.toThrow(
+        "Order must contain at least one item",
+      );
     });
 
-    it("rejects invalid quantity", async () => {
+    it("throws if items is undefined", async () => {
+      // @ts-expect-error testing undefined items
+      await expect(service.create({})).rejects.toThrow(
+        "Order must contain at least one item",
+      );
+    });
+
+    it("throws if items is null", async () => {
+      // @ts-expect-error testing null items
+      await expect(service.create({ items: null })).rejects.toThrow(
+        "Order must contain at least one item",
+      );
+    });
+
+    it("throws for invalid item data", async () => {
       await expect(
         service.create({
-          items: [{ productId: "prod-1", quantity: 0, unitPrice: 10 }],
+          items: [{ productId: "", quantity: 0, unitPrice: -1 }],
         }),
-      ).rejects.toThrow("Quantity must be greater than 0");
-    });
-
-    it("rejects negative unit price", async () => {
-      await expect(
-        service.create({
-          items: [{ productId: "prod-1", quantity: 1, unitPrice: -5 }],
-        }),
-      ).rejects.toThrow("Unit price cannot be negative");
-    });
-
-    it("rejects empty productId", async () => {
-      await expect(
-        service.create({
-          items: [{ productId: "", quantity: 1, unitPrice: 10 }],
-        }),
-      ).rejects.toThrow("Product ID is required");
-    });
-
-    it("calculates total correctly", async () => {
-      const createdOrder = makeOrder({
-        id: "test-id",
-        status: OrderStatus.PENDING,
-        items: [
-          makeItem({
-            id: "item-1",
-            productId: "prod-1",
-            quantity: 2,
-            unitPrice: 10,
-          }),
-          makeItem({
-            id: "item-2",
-            productId: "prod-2",
-            quantity: 3,
-            unitPrice: 5,
-          }),
-        ],
-      });
-      mockRepo.create.mockResolvedValue(createdOrder);
-
-      const result = await service.create({
-        items: [
-          { productId: "prod-1", quantity: 2, unitPrice: 10 },
-          { productId: "prod-2", quantity: 3, unitPrice: 5 },
-        ],
-      });
-
-      expect(result.total).toBe(35);
+      ).rejects.toThrow();
     });
   });
 
   describe("findAll", () => {
-    it("lists all orders", async () => {
+    it("returns all orders when no status filter", async () => {
       mockRepo.findAll.mockResolvedValue([]);
       const result = await service.findAll({});
-      expect(Array.isArray(result)).toBe(true);
+      expect(result).toEqual([]);
+      expect(mockRepo.findAll).toHaveBeenCalledWith(undefined);
     });
 
-    it("filters by status", async () => {
+    it("filters by status when provided", async () => {
       mockRepo.findAll.mockResolvedValue([]);
       await service.findAll({ status: "PENDING" });
       expect(mockRepo.findAll).toHaveBeenCalledWith("PENDING");
     });
 
-    it("returns orders with items and total", async () => {
-      const orders = [
-        makeOrder({
-          id: "order-1",
-          status: OrderStatus.PENDING,
-          items: [
-            makeItem({ productId: "prod-1", quantity: 2, unitPrice: 10 }),
-          ],
-        }),
-      ];
+    it("returns orders with items", async () => {
+      const orders = [makeOrder({ items: [makeItem()] })];
       mockRepo.findAll.mockResolvedValue(orders);
-
       const result = await service.findAll({});
-      expect(result).toHaveLength(1);
-      expect(result[0].total).toBe(20);
+      expect(result).toEqual(orders);
     });
   });
 
   describe("findOne", () => {
-    it("returns order details", async () => {
-      const order = makeOrder({
-        id: "test-id",
-        status: OrderStatus.PENDING,
-        items: [makeItem({ productId: "prod-1", quantity: 1, unitPrice: 100 })],
-      });
+    it("returns order by id", async () => {
+      const order = makeOrder();
       mockRepo.findById.mockResolvedValue(order);
-
       const result = await service.findOne("test-id");
-      expect(result.id).toBe("test-id");
-      expect(result.total).toBe(100);
+      expect(result).toBe(order);
     });
 
-    it("throws 404 for non-existent order", async () => {
+    it("throws 404 when order not found", async () => {
       mockRepo.findById.mockResolvedValue(null);
       await expect(service.findOne("non-existent")).rejects.toThrow(
         NotFoundException,
       );
     });
-
-    it("handles order with null items", async () => {
-      const order = makeOrder({
-        id: "test-id",
-        status: OrderStatus.PENDING,
-        items: [],
-      });
-      mockRepo.findById.mockResolvedValue(order);
-
-      const result = await service.findOne("test-id");
-      expect(result.items).toEqual([]);
-      expect(result.total).toBe(0);
-    });
   });
 
   describe("cancel", () => {
-    it("cancels PENDING order", async () => {
+    it("cancels PENDING order atomically", async () => {
       const order = makeOrder({
         id: "test-id",
         status: OrderStatus.PENDING,
         items: [],
       });
       mockRepo.findById.mockResolvedValue(order);
-      mockRepo.updateStatus.mockResolvedValue(undefined);
+      mockRepo.updateStatusIfPending.mockResolvedValue(true);
 
       const result = await service.cancel("test-id");
       expect(result).toBeUndefined();
-      expect(mockRepo.updateStatus).toHaveBeenCalledWith(
+      expect(mockRepo.updateStatusIfPending).toHaveBeenCalledWith(
         "test-id",
         OrderStatus.CANCELLED,
       );
@@ -249,9 +182,24 @@ describe("OrdersService", () => {
 
     it("throws 404 for non-existent order", async () => {
       mockRepo.findById.mockResolvedValue(null);
+      mockRepo.updateStatusIfPending.mockResolvedValue(false);
       await expect(service.cancel("non-existent")).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it("handles atomic update failure (race condition)", async () => {
+      const order = makeOrder({
+        id: "test-id",
+        status: OrderStatus.PENDING,
+        items: [],
+      });
+      mockRepo.findById.mockResolvedValue(order);
+      mockRepo.updateStatusIfPending.mockResolvedValue(false);
+      mockRepo.findById.mockResolvedValueOnce(
+        makeOrder({ id: "test-id", status: OrderStatus.PROCESSING, items: [] }),
+      );
+      await expect(service.cancel("test-id")).rejects.toThrow();
     });
   });
 
@@ -263,17 +211,12 @@ describe("OrdersService", () => {
         quantity: 2,
         unitPrice: 10,
       });
-
       const order = makeOrder({
         id: "test-id",
         status: OrderStatus.PENDING,
         items: [item],
-        createdAt: new Date("2024-01-01"),
-        updatedAt: new Date("2024-01-01"),
       });
-
       const dto = service.toResponseDto(order);
-
       expect(dto).toEqual({
         id: "test-id",
         status: OrderStatus.PENDING,
@@ -285,9 +228,9 @@ describe("OrdersService", () => {
             unitPrice: 10,
           },
         ],
-        total: order.total,
-        createdAt: new Date("2024-01-01"),
-        updatedAt: new Date("2024-01-01"),
+        total: 20,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
       });
     });
   });

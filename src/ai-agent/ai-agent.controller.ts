@@ -6,6 +6,7 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from "@nestjs/swagger";
 import { AiAgentService } from "./ai-agent.service";
@@ -21,7 +22,7 @@ export class AiAgentController {
   @ApiResponse({ status: 200, description: "Message processed successfully" })
   async chat(@Body() body: { message: string; orderId?: string }) {
     if (!body.message || typeof body.message !== "string") {
-      return { response: "Message is required", log: null };
+      throw new BadRequestException("Message is required and must be a string");
     }
     return this.aiService.process(body.message, body.orderId);
   }
@@ -31,7 +32,7 @@ export class AiAgentController {
   @ApiQuery({
     required: false,
     name: "limit",
-    description: "Number of logs to return",
+    description: "Number of logs to return (1-100)",
   })
   @ApiQuery({
     required: false,
@@ -49,8 +50,12 @@ export class AiAgentController {
     @Query("intent") intent?: string,
     @Query("injection") injection?: string,
   ) {
+    const parsedLimit = limit ? parseInt(limit, 10) : 50;
+    if (!Number.isFinite(parsedLimit) || parsedLimit < 1) {
+      throw new BadRequestException("Limit must be a positive number");
+    }
     const logs = await this.aiService.getLogs(
-      limit ? parseInt(limit) : 50,
+      Math.min(parsedLimit, 100),
       intent,
       injection === "true" ? true : injection === "false" ? false : undefined,
     );

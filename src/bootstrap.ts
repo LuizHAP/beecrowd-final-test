@@ -35,10 +35,6 @@ export async function bootstrap(): Promise<void> {
     pinoHttp({
       customProps,
       customReceivedMessage,
-      transport: {
-        target: "pino/file",
-        options: { destination: 1 },
-      },
     }),
   );
 

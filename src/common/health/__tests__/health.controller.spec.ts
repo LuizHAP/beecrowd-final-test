@@ -31,13 +31,11 @@ describe("HealthController", () => {
       expect(result.timestamp).toBeDefined();
     });
 
-    it("returns degraded status when database query fails", async () => {
+    it("throws 503 when database query fails", async () => {
       mockPrisma.$queryRaw.mockRejectedValue(new Error("connection refused"));
 
-      const result = await controller.check();
-
-      expect(result.status).toBe("degraded");
-      expect(result.database).toBe("disconnected");
+      await expect(controller.check()).rejects.toThrow();
+      expect(mockLoggingService.warn).toHaveBeenCalled();
     });
   });
 });

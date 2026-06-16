@@ -7,10 +7,6 @@ export class LoggingService implements LoggerService {
 
   constructor() {
     this.logger = pino({
-      transport: {
-        target: "pino/file",
-        options: { destination: 1 },
-      },
       base: { pid: false },
     });
   }

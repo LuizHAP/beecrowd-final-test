@@ -49,17 +49,19 @@ export class OrdersService {
   }
 
   async cancel(id: string): Promise<void> {
-    const order = await this.orderRepo.findById(id);
-    if (!order) {
-      throw new NotFoundException("Order not found");
-    }
-    if (!order.canCancel()) {
+    const updated = await this.orderRepo.updateStatusIfPending(
+      id,
+      OrderStatus.CANCELLED,
+    );
+    if (!updated) {
+      const order = await this.orderRepo.findById(id);
+      if (!order) {
+        throw new NotFoundException("Order not found");
+      }
       throw new BadRequestException(
         `Order cannot be cancelled. Current status: ${order.status}`,
       );
     }
-    order.cancel();
-    await this.orderRepo.updateStatus(id, OrderStatus.CANCELLED);
   }
 
   toResponseDto(order: Order): OrderResponseDto {

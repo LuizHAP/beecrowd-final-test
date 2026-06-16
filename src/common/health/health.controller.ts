@@ -1,4 +1,4 @@
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, HttpStatus, HttpException } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { PrismaService } from "../prisma/prisma.service";
 import { LoggingService } from "../logging/logging.service";
@@ -18,6 +18,7 @@ export class HealthController {
   @Get()
   @ApiOperation({ summary: "Health check" })
   @ApiResponse({ status: 200, description: "Service is healthy" })
+  @ApiResponse({ status: 503, description: "Service is degraded" })
   async check() {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
@@ -29,7 +30,10 @@ export class HealthController {
       };
     } catch {
       this.logger.warn("Health check failed — database disconnected");
-      return { status: "degraded", database: "disconnected" };
+      throw new HttpException(
+        { status: "degraded", database: "disconnected" },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
     }
   }
 }

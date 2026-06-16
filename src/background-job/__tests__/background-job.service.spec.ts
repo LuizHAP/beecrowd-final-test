@@ -23,6 +23,7 @@ describe("BackgroundJobService", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    mockPrisma.$executeRawUnsafe.mockReset();
     service = new BackgroundJobService(
       mockPrisma as any,
       mockLoggingService as any,
@@ -57,10 +58,34 @@ describe("BackgroundJobService", () => {
     });
 
     it("handles unknown error type", async () => {
-      mockPrisma.$executeRawUnsafe.mockRejectedValue("string error");
+      mockPrisma.$executeRawUnsafe
+        .mockReset()
+        .mockRejectedValue("string error");
       const result = await service.transitionPendingToProcessing();
       expect(result.updated).toBe(0);
       expect(result.error).toBe("Unknown error");
+      expect((service as any).running).toBe(false);
+    });
+
+    it("skips execution when job is already running", async () => {
+      (service as any).running = true;
+      const result = await service.transitionPendingToProcessing();
+      expect(result.updated).toBe(0);
+      expect(mockLoggingService.warn).toHaveBeenCalledWith(
+        "Skipping job — previous execution still running",
+      );
+    });
+
+    it("resets running flag after error", async () => {
+      mockPrisma.$executeRawUnsafe.mockRejectedValue(new Error("DB error"));
+      await service.transitionPendingToProcessing();
+      expect((service as any).running).toBe(false);
+    });
+
+    it("resets running flag after success", async () => {
+      mockPrisma.$executeRawUnsafe.mockResolvedValue(3);
+      await service.transitionPendingToProcessing();
+      expect((service as any).running).toBe(false);
     });
   });
 

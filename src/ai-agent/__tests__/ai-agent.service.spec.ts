@@ -19,6 +19,7 @@ const mockOrderRepo = {
   findAll: jest.fn(),
   create: jest.fn(),
   updateStatus: jest.fn(),
+  updateStatusIfPending: jest.fn(),
 };
 
 const mockPrisma = {
@@ -91,7 +92,7 @@ describe("AiAgentService", () => {
         items: [],
       });
       mockOrderRepo.findById.mockResolvedValue(order);
-      mockOrderRepo.updateStatus.mockResolvedValue(undefined);
+      mockOrderRepo.updateStatusIfPending.mockResolvedValue(true);
 
       const { response, log } = await service.process(
         "I want to cancel my order",
@@ -101,6 +102,24 @@ describe("AiAgentService", () => {
       expect(log.toolCalled).toBe("CANCEL_ORDER");
       expect(log.toolSuccess).toBe(true);
       expect(response).toContain("cancelled");
+    });
+
+    it("handles cancel order with atomic update failure (race condition)", async () => {
+      const order = makeOrder({
+        id: "test-id",
+        status: OrderStatus.PENDING,
+        items: [],
+      });
+      mockOrderRepo.findById.mockResolvedValue(order);
+      mockOrderRepo.updateStatusIfPending.mockResolvedValue(false);
+
+      const { response, log } = await service.process(
+        "I want to cancel my order",
+        "test-id",
+      );
+      expect(log.toolCalled).toBe("CANCEL_ORDER");
+      expect(log.toolSuccess).toBe(false);
+      expect(response).toContain("Status changed");
     });
 
     it("rejects cancel for non-PENDING order", async () => {
@@ -435,7 +454,7 @@ describe("AiAgentService", () => {
         items: [],
       });
       mockOrderRepo.findById.mockResolvedValue(order);
-      mockOrderRepo.updateStatus.mockResolvedValue(order);
+      mockOrderRepo.updateStatusIfPending.mockResolvedValue(true);
 
       const { response, log } = await service.process("Cancel my order");
       expect(log.toolCalled).toBe("CANCEL_ORDER");

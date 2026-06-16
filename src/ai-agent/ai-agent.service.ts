@@ -236,8 +236,16 @@ export class AiAgentService {
           message: `Order ${orderId} cannot be cancelled. Current status: ${order.status}.`,
         };
       }
-      order.cancel();
-      await this.orderRepo.updateStatus(orderId, OrderStatus.CANCELLED);
+      const updated = await this.orderRepo.updateStatusIfPending(
+        orderId,
+        OrderStatus.CANCELLED,
+      );
+      if (!updated) {
+        return {
+          success: false,
+          message: `Order ${orderId} cannot be cancelled. Status changed to ${order.status} while processing.`,
+        };
+      }
       return {
         success: true,
         message: `Order ${orderId} has been successfully cancelled.`,
@@ -289,12 +297,17 @@ export class AiAgentService {
     unitPrice: string;
   }): Promise<{ response: string }> {
     try {
+      const quantity = parseInt(args.quantity, 10);
+      const unitPrice = parseFloat(args.unitPrice);
+      if (!Number.isFinite(quantity) || !Number.isFinite(unitPrice)) {
+        throw new Error("Invalid quantity or price");
+      }
       const dto = {
         items: [
           {
             productId: args.productId,
-            quantity: parseInt(args.quantity, 10),
-            unitPrice: parseFloat(args.unitPrice),
+            quantity,
+            unitPrice,
           },
         ],
       };

@@ -26,6 +26,7 @@ describe("PrismaOrderRepository", () => {
         create: jest.fn(),
         update: jest.fn(),
       },
+      $executeRawUnsafe: jest.fn(),
     };
     repo = new PrismaOrderRepository(mockPrisma as any);
   });
@@ -136,6 +137,21 @@ describe("PrismaOrderRepository", () => {
         where: { id: "order-1" },
         data: { status: "CANCELLED" },
       });
+    });
+  });
+
+  describe("updateStatusIfPending", () => {
+    it("returns true when order is PENDING and updated", async () => {
+      mockPrisma.$executeRawUnsafe.mockResolvedValue([{ id: "order-1" }]);
+      const result = await repo.updateStatusIfPending("order-1", "CANCELLED");
+      expect(result).toBe(true);
+      expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalled();
+    });
+
+    it("returns false when order is not PENDING", async () => {
+      mockPrisma.$executeRawUnsafe.mockResolvedValue([]);
+      const result = await repo.updateStatusIfPending("order-1", "CANCELLED");
+      expect(result).toBe(false);
     });
   });
 });

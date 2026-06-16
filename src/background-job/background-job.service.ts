@@ -5,6 +5,7 @@ import { LoggingService } from "../common/logging/logging.service";
 @Injectable()
 export class BackgroundJobService implements OnModuleInit, OnModuleDestroy {
   private intervalId: ReturnType<typeof setInterval> | null = null;
+  private running = false;
   private logger: LoggingService;
 
   constructor(
@@ -49,6 +50,13 @@ export class BackgroundJobService implements OnModuleInit, OnModuleDestroy {
     updated: number;
     error?: string;
   }> {
+    if (this.running) {
+      this.logger.warn("Skipping job — previous execution still running");
+      return { updated: 0 };
+    }
+    this.running = true;
+    let updated = 0;
+    let errorMsg: string | undefined;
     try {
       const result = await this.prisma.$executeRawUnsafe(`
         UPDATE "Order"
@@ -61,13 +69,13 @@ export class BackgroundJobService implements OnModuleInit, OnModuleDestroy {
           FOR UPDATE SKIP LOCKED
         )
       `);
-
+      updated = result;
       this.logger.info("Orders transitioned to PROCESSING", { count: result });
-      return { updated: result };
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      errorMsg = error instanceof Error ? error.message : "Unknown error";
       this.logger.error("Background job failed", { error: errorMsg });
-      return { updated: 0, error: errorMsg };
     }
+    this.running = false;
+    return { updated, error: errorMsg };
   }
 }
