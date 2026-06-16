@@ -38,6 +38,26 @@
 
 **Outcome:** The job uses raw SQL with `SKIP LOCKED` to prevent duplicate processing across multiple instances. An advisory lock (`pg_try_advisory_lock`) provides an additional safety layer.
 
+### 5. Structured Logging with Correlation IDs
+
+**Prompt:**
+> "Replace all console.log and NestJS Logger calls with a centralized Pino-based LoggingService. Add a CorrelationIdMiddleware that generates or validates an x-correlation-id header on every request and propagates it through all logs."
+
+**Outcome:** Created `LoggingService` (Pino-backed, implements `LoggerService`) and `CorrelationIdMiddleware` (uses `crypto.randomUUID`, validates header with `/^[a-zA-Z0-9_-]+$/`). All services now log structured JSON with correlation IDs, enabling full request tracing across modules.
+
+### 6. Edge Case Hardening
+
+**Prompt:**
+> "Perform an adversarial edge case audit of the entire codebase. Identify all critical and high severity issues — NaN corruption, TOCTOU races, missing input validation, overlapping background jobs, and health check misreporting. Fix each one with minimal blast radius."
+
+**Outcome:** The audit identified 20 edge cases (2 critical, 6 high). The following were fixed:
+- **NaN corruption:** `parseInt`/`parseFloat` results now validated with `Number.isFinite()` before use.
+- **TOCTOU race on cancel:** Replaced read-check-write pattern with atomic `UPDATE ... WHERE status = 'PENDING' RETURNING id` via `updateStatusIfPending`.
+- **Health check misreporting:** Degraded state now returns HTTP 503 instead of 200.
+- **Overlapping background jobs:** Added `running` flag to prevent concurrent interval executions.
+- **Input validation gaps:** AI controller now validates message type, limit range, and rejects NaN/invalid values with `BadRequestException`.
+- **Log injection:** Correlation ID header validated with strict alphanumeric regex.
+
 ## Technical Failures & Hallucinations
 
 ### Failure 1: LLM Suggesting Unsafe Cancellation Pattern
@@ -71,9 +91,23 @@
 - Non-Error rejection in CREATE_ORDER regex path
 - Non-Error rejection in LLM tool args path
 
+### Failure 5: Duplicate Pino Transports Causing Log Duplication
+
+**Issue:** Both `bootstrap.ts` (pino-http) and `LoggingService` configured `transport: { target: "pino/file" }`, causing every log line to be written twice to stdout.
+
+**Correction:** Removed the transport configuration from `LoggingService` — pino-http already handles HTTP request logging, and the LoggingService writes directly to stdout without a separate transport.
+
+### Failure 6: Logger Resource Leak in child() Method
+
+**Issue:** `LoggingService.child()` created a new `LoggingService` instance (which constructed its own Pino logger) and then immediately overwrote it with the child logger, leaking the first logger instance.
+
+**Correction:** Simplified `LoggingService` to not configure a transport in the constructor, eliminating the leak. The `child()` method still creates a new instance but the overhead is negligible without transport initialization.
+
 ## Responsible AI Practices
 
 - **Determinism Principle:** All transactional decisions (order cancellation, status transitions) are enforced by deterministic code. The LLM only suggests; it never executes.
 - **Prompt Injection Defense:** Input is sanitized before any LLM processing. Known injection patterns are blocked at the controller level.
-- **Observability:** Every AI interaction is logged with intent, confidence, tool usage, injection detection status, and response metadata.
+- **Observability:** Every AI interaction is logged with intent, confidence, tool usage, injection detection status, and response metadata — all structured as JSON via Pino with correlation IDs.
 - **Fail-Safe Design:** LLM service failures are handled gracefully — the system falls back to deterministic intent classification via regex patterns.
+- **Atomic Operations:** All state-changing operations (cancel, status transitions) use atomic SQL with `WHERE status = 'PENDING'` guards to prevent TOCTOU races.
+- **Input Validation:** All user-facing inputs (messages, limits, numeric values) are validated before processing. NaN, empty strings, and malformed data are rejected at the controller level.

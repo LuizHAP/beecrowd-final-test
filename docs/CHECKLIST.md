@@ -14,11 +14,14 @@
 ### FR-003 — Automatic Transition of Status (Background Job) ✅
 - [x] Background routine transitions PENDING → PROCESSING every 5 minutes
 - [x] `SELECT ... FOR UPDATE SKIP LOCKED` for distributed concurrency
+- [x] Overlapping execution prevention via `running` flag
+- [x] Proper cleanup via `OnModuleDestroy`
 - **Files:** `src/background-job/background-job.service.ts`, `src/background-job/background-job.module.ts`
 
 ### FR-004 — Transactional Cancellation Rule ✅
 - [x] Cancel order only when status is PENDING
 - [x] Reject cancellation for PROCESSING, SHIPPED, DELIVERED
+- [x] Atomic `UPDATE ... WHERE status = 'PENDING'` prevents TOCTOU races
 - **Files:** `src/orders/orders.service.ts`, `src/domain/order/order.entity.ts`
 
 ### FR-005 — Intelligent Support Agent ✅
@@ -27,6 +30,7 @@
 - [x] RAG contextualization with `knowledge_base.json`
 - [x] Tool calling for automatic order cancellation
 - [x] AI-generated explanatory responses for denied actions
+- [x] Input validation (message type, NaN guards, limit range)
 - **Files:** `src/ai-agent/ai-agent.controller.ts`, `src/ai-agent/ai-agent.service.ts`, `src/ai-agent/llm.service.ts`
 
 ---
@@ -35,24 +39,29 @@
 
 ### Concurrency in Distributed Environments ✅
 - [x] `SELECT ... FOR UPDATE SKIP LOCKED` prevents race conditions
-- [x] Advisory locks for background job coordination
-- **Files:** `src/background-job/background-job.service.ts`
+- [x] Atomic `updateStatusIfPending` for race-free cancellation
+- [x] Background job overlapping prevention
+- **Files:** `src/background-job/background-job.service.ts`, `src/orders/prisma-order.repository.ts`
 
 ### Prompt Injection Security and Mitigation ✅
 - [x] Prompt injection detection before LLM processing
 - [x] Deterministic validation for all business-critical decisions
-- **Files:** `src/ai-agent/ai-agent.service.ts`
+- [x] Correlation ID header validation (alphanumeric regex)
+- **Files:** `src/ai-agent/ai-agent.service.ts`, `src/common/logging/correlation-id.middleware.ts`
 
 ### LLM Observability ✅
 - [x] AI logs stored in database (intent, tokens, response time, tool usage, injection detection)
 - [x] `GET /api/ai/logs` endpoint with filtering (limit, intent, injection)
-- **Files:** `src/ai-agent/ai-agent.service.ts`, `prisma/schema.prisma`
+- [x] Structured JSON logging via Pino with correlation IDs
+- [x] Request-level correlation ID propagation across all modules
+- **Files:** `src/ai-agent/ai-agent.service.ts`, `src/common/logging/logging.service.ts`, `prisma/schema.prisma`
 
 ### Technological Isolation ✅
 - [x] Docker Compose with PostgreSQL and NestJS app
 - [x] Health check on database container
+- [x] Health endpoint returns 503 when database is unreachable
 - [x] Environment variables via `.env` file
-- **Files:** `docker-compose.yml`, `Dockerfile`, `.env.example`
+- **Files:** `docker-compose.yml`, `Dockerfile`, `.env.example`, `src/common/health/health.controller.ts`
 
 ---
 
@@ -69,6 +78,27 @@
 
 ---
 
+## Edge Case Hardening
+
+### Critical Fixes ✅
+- [x] NaN corruption via parseInt/parseFloat — guarded with `Number.isFinite()`
+- [x] Unauthenticated logs endpoint input validation — `BadRequestException` for invalid inputs
+
+### High Severity Fixes ✅
+- [x] TOCTOU race: cancel vs background job — atomic `updateStatusIfPending`
+- [x] Concurrent cancel race — same atomic SQL guard
+- [x] Health check returns 200 for degraded — now returns 503
+- [x] NaN in getLogs limit — `Number.isFinite()` + `Math.min()` guard
+
+### Medium Severity Fixes ✅
+- [x] Overlapping background job executions — `running` flag guard
+- [x] Logger resource leak in child() — simplified without transport
+- [x] Double Pino transport — removed redundant transport config
+- [x] Correlation ID log injection — strict regex validation
+- [x] ESLint version mismatch — aligned `@eslint/js` with `eslint`
+
+---
+
 ## Deliveries
 
 ### GitHub Repository ✅
@@ -79,24 +109,27 @@
 - [x] Backend API (NestJS)
 - [x] Background Job (distributed, SKIP LOCKED)
 - [x] AI orchestration layer (RAG, tool calling, guardrails)
+- [x] Structured logging with Pino + correlation IDs
 
 ### Containerized Environment ✅
 - [x] `docker-compose.yml` with database and app
 - [x] `Dockerfile` for NestJS application
 
 ### Automated Testing ✅
-- [x] **165 unit tests** — 100% coverage (lines, branches, functions, statements)
+- [x] **198 unit tests** — 100% coverage (lines, branches, functions, statements)
 - [x] **2 E2E tests** — health check + Swagger endpoint
 - [x] Order status transition validations
 - [x] AI pipeline tool calling flows
+- [x] Edge case tests (NaN, race conditions, atomic updates, overlapping jobs)
 - **Files:** `src/**/__tests__/*.spec.ts`, `test/app.e2e-spec.ts`
 
 ### Software Design Document (SDD) ✅
 - [x] `README.md` with architectural choices
 - [x] Database design rationale
 - [x] Distributed concurrency strategy
-- [x] NestJS vs Next.js rationale
 - [x] AI agent pipeline documentation
+- [x] GenAI Report (`docs/GENAI_REPORT.md`) — tools, prompts, failures, corrections
+- [x] OpenAPI specification (`docs/swagger.json`)
 
 ---
 
@@ -104,10 +137,10 @@
 
 | Criteria | Weight | Status |
 |----------|--------|--------|
-| Software Architecture and Backend Resiliency | 30 | ✅ DDD/SOLID, SKIP LOCKED, Docker |
-| AI Engineering and Responsible AI | 30 | ✅ RAG, tool calling, guardrails, logs |
-| Automated Testing Strategy | 20 | ✅ 100% coverage, E2E tests |
-| Technical Maturity and GenAI Report | 20 | ✅ README.md with full rationale |
+| Software Architecture and Backend Resiliency | 30 | ✅ DDD/SOLID, atomic operations, SKIP LOCKED, Docker |
+| AI Engineering and Responsible AI | 30 | ✅ RAG, tool calling, guardrails, structured logs, correlation IDs |
+| Automated Testing Strategy | 20 | ✅ 100% coverage (198 tests), E2E tests, edge case coverage |
+| Technical Maturity and GenAI Report | 20 | ✅ README.md + GENAI_REPORT.md with full rationale |
 
 ---
 
@@ -125,6 +158,10 @@ src/
 │   └── __tests__/
 ├── common/                # Shared modules
 │   ├── health/            # Health check
+│   ├── logging/           # Pino logging + correlation ID
+│   │   ├── logging.service.ts
+│   │   ├── correlation-id.middleware.ts
+│   │   └── __tests__/
 │   └── prisma/            # Prisma ORM
 ├── domain/order/          # Domain entities
 │   ├── order.entity.ts
@@ -134,6 +171,7 @@ src/
 ├── orders/                # Order management
 │   ├── orders.controller.ts
 │   ├── orders.service.ts
+│   ├── prisma-order.repository.ts
 │   ├── dto.ts
 │   └── __tests__/
 ├── app.module.ts
@@ -151,7 +189,7 @@ src/
 | DELETE | `/api/orders/:id` | Cancel order (PENDING only) |
 | POST | `/api/ai/chat` | AI agent chat |
 | GET | `/api/ai/logs` | AI observability logs |
-| GET | `/api/health` | Health check |
+| GET | `/api/health` | Health check (200 OK / 503 Service Unavailable) |
 
 ## Test Coverage
 
