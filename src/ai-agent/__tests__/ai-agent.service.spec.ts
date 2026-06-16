@@ -201,6 +201,134 @@ describe("AiAgentService", () => {
       expect(result.response).toContain("Please provide the order ID");
     });
 
+    it("should extract orderId from toolArgs for cancel", async () => {
+      mockLlmService.classifyIntent.mockResolvedValue({
+        intent: "CANCEL_ORDER",
+        shouldCallTool: true,
+        confidence: 0.95,
+        toolArgs: {
+          productId: "prod-1",
+          quantity: "1",
+          unitPrice: "10",
+          orderId: "order-1",
+        },
+      });
+      mockRepo.findById.mockResolvedValue(makeOrder(OrderStatus.PENDING));
+      mockRepo.updateStatusIfPending.mockResolvedValue(true);
+
+      const result = await service.process("cancel");
+
+      expect(result.response).toBe(
+        "Order order-1 has been successfully cancelled.",
+      );
+    });
+
+    it("should extract orderId from toolArgs for check status", async () => {
+      mockLlmService.classifyIntent.mockResolvedValue({
+        intent: "CHECK_STATUS",
+        shouldCallTool: false,
+        confidence: 0.9,
+        toolArgs: {
+          productId: "prod-1",
+          quantity: "1",
+          unitPrice: "10",
+          orderId: "order-1",
+        },
+      });
+      mockRepo.findById.mockResolvedValue(makeOrder(OrderStatus.PENDING));
+
+      const result = await service.process("check");
+
+      expect(result.response).toMatch(/Order order-1 is currently PENDING/);
+    });
+
+    it("should use llmIntentResult for create order path with toolArgs", async () => {
+      mockLlmService.classifyIntent.mockResolvedValue({
+        intent: "CREATE_ORDER",
+        shouldCallTool: true,
+        confidence: 0.9,
+        toolArgs: {
+          productId: "prod-1",
+          quantity: "1",
+          unitPrice: "10",
+        },
+      });
+
+      const createdOrder = new Order({
+        id: "new-order",
+        status: OrderStatus.PENDING,
+        items: [
+          new OrderItem({
+            id: "item-1",
+            productId: "prod-1",
+            quantity: 1,
+            unitPrice: 10,
+          }),
+        ],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      mockRepo.create.mockResolvedValue(createdOrder);
+
+      const result = await service.process("create order");
+
+      expect(result.log.intent).toBe("CREATE_ORDER");
+      expect(result.response).toContain("Order created");
+    });
+
+    it("should handle CREATE_ORDER via fallback with null llmIntentResult", async () => {
+      mockLlmService.classifyIntent.mockRejectedValue(new Error("API error"));
+
+      const result = await service.process("I want to buy something");
+
+      expect(result.log.intent).toBe("CREATE_ORDER");
+      expect(result.response).toContain("Please provide");
+    });
+
+    it("should fallback to RAG when LLM returns empty response with order context", async () => {
+      mockLlmService.classifyIntent.mockResolvedValue({
+        intent: "GENERAL_HELP",
+        shouldCallTool: false,
+        confidence: 0.9,
+      });
+      mockLlmService.generateResponse.mockResolvedValue("");
+      mockRepo.findById.mockResolvedValue(makeOrder(OrderStatus.PENDING));
+
+      const result = await service.process("hello", "order-1");
+
+      expect(result.response).toMatch(/Here's what I can help you with/);
+      expect(result.response).toContain(
+        "Your order order-1 is currently PENDING",
+      );
+    });
+
+    it("should fallback to RAG when LLM returns empty response without order context", async () => {
+      mockLlmService.classifyIntent.mockResolvedValue({
+        intent: "GENERAL_HELP",
+        shouldCallTool: false,
+        confidence: 0.9,
+      });
+      mockLlmService.generateResponse.mockResolvedValue("");
+
+      const result = await service.process("hello");
+
+      expect(result.response).toMatch(/Here's what I can help you with/);
+      expect(result.response).toContain("Please provide an order ID");
+    });
+
+    it("should use RAG with order context when LLM disabled", async () => {
+      mockLlmService.isEnabled.mockReturnValue(false);
+      mockRepo.findById.mockResolvedValue(makeOrder(OrderStatus.PENDING));
+
+      const result = await service.process("hello", "order-1");
+
+      expect(result.response).toMatch(/Here's what I can help you with/);
+      expect(result.response).toContain(
+        "Your order order-1 is currently PENDING",
+      );
+    });
+
     it("should handle tool call errors", async () => {
       mockLlmService.classifyIntent.mockResolvedValue({
         intent: "CANCEL_ORDER",
@@ -303,6 +431,62 @@ describe("AiAgentService", () => {
 
       expect(result.log.toolSuccess).toBe(false);
       expect(result.response).toContain("Error cancelling order");
+    });
+
+    it("should handle cancel order DB error with non-Error thrown", async () => {
+      mockLlmService.classifyIntent.mockResolvedValue({
+        intent: "CANCEL_ORDER",
+        shouldCallTool: true,
+        confidence: 0.95,
+      });
+      mockRepo.findById.mockImplementation(() => {
+        throw "string error";
+      });
+
+      const result = await service.process("cancel order", "order-1");
+
+      expect(result.log.toolSuccess).toBe(false);
+      expect(result.response).toContain(
+        "Error cancelling order: Unknown error",
+      );
+    });
+
+    it("should handle create order with non-Error thrown", async () => {
+      mockLlmService.classifyIntent.mockResolvedValue({
+        intent: "CREATE_ORDER",
+        shouldCallTool: true,
+        confidence: 0.9,
+        toolArgs: {
+          productId: "prod-123",
+          quantity: "2",
+          unitPrice: "50",
+        },
+      });
+      mockRepo.create.mockImplementation(() => {
+        throw "string error";
+      });
+
+      const result = await service.process("create order");
+
+      expect(result.response).toContain("I couldn't create the order");
+      expect(result.response).toContain("Invalid data");
+    });
+
+    it("should handle persist error with non-Error thrown", async () => {
+      mockPrisma.aILog.create.mockImplementation(() => {
+        throw "string error";
+      });
+      mockLlmService.classifyIntent.mockResolvedValue({
+        intent: "GENERAL_HELP",
+        shouldCallTool: false,
+        confidence: 0.9,
+      });
+      mockLlmService.generateResponse.mockResolvedValue("AI response");
+
+      const result = await service.process("hello");
+
+      expect(result.response).toBe("AI response");
+      expect(mockLoggingService.error).toHaveBeenCalled();
     });
 
     it("should handle LLM returning empty response", async () => {
@@ -457,6 +641,16 @@ describe("AiAgentService", () => {
 
     it("should extract CREATE_ORDER intent", () => {
       const result = service["extractIntent"]("I want to buy something");
+      expect(result).toBe("CREATE_ORDER");
+    });
+
+    it("should extract GENERAL_HELP via support keyword", () => {
+      const result = service["extractIntent"]("I need support");
+      expect(result).toBe("GENERAL_HELP");
+    });
+
+    it("should extract CREATE_ORDER via purchase keyword", () => {
+      const result = service["extractIntent"]("I want to purchase an item");
       expect(result).toBe("CREATE_ORDER");
     });
 

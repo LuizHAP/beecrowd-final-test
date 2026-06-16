@@ -143,6 +143,20 @@ describe("LLMService", () => {
       expect(result.shouldCallTool).toBe(false);
       expect(result.confidence).toBe(0);
     });
+
+    it("should handle string errors gracefully", async () => {
+      process.env.OPENAI_API_KEY = "test-key";
+      mockState.failWithString = true;
+
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { LLMService } = require("../llm.service");
+      service = new LLMService(mockLoggingService);
+      const result = await service.classifyIntent("test");
+
+      expect(result.intent).toBe("GENERAL_HELP");
+      expect(result.shouldCallTool).toBe(false);
+      expect(result.confidence).toBe(0);
+    });
   });
 
   describe("generateResponse", () => {

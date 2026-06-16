@@ -58,6 +58,34 @@
 - **Input validation gaps:** AI controller now validates message type, limit range, and rejects NaN/invalid values with `BadRequestException`.
 - **Log injection:** Correlation ID header validated with strict alphanumeric regex.
 
+### 7. Strict Typing & `any` Elimination
+
+**Prompt:**
+> "Remove all `any` types from the codebase. Add `noImplicitAny` to tsconfig. Every variable, parameter, and return type must be explicitly typed with the correct type. Tests must still pass at 100% coverage."
+
+**Outcome:** The entire codebase was audited for implicit and explicit `any` usage. The `AILogEntry` interface was expanded with Prisma fields (`id`, `orderId`, `timestamp`, `rawInput`, `rawOutput`) typed as `string | null` to match the schema. The `getLogs` method now maps Prisma `AILog` results to `AILogEntry[]` with explicit field casting. Knowledge base entries (`kb`) received typed parameters (`{ context: string; rule: string }`). `tsconfig.json` already had `noImplicitAny: true`, and the full type check (`tsc --noEmit`) passed with zero errors.
+
+### 8. Background Job Removal & Test Restoration
+
+**Prompt:**
+> "Remove all background task infrastructure. Fix tests to maintain 100% unit test coverage. Verify E2E tests pass. Remove unused dependencies like @nestjs/schedule."
+
+**Outcome:** The `background-job` module (service, module, tests) was fully removed. `@nestjs/schedule` was removed from `package.json`. The `AiAgentService` tests were rewritten from scratch — the previous `mockState` pattern (using `jest.fn()` without type parameters) caused `never` type inference on every mock return value, breaking compilation. Replaced with `jest.MockedObjectDeep<T>` and `jest.fn().mockResolvedValue()` patterns. The `orders.service.spec.ts` was updated to match the current API (`toResponseDto` instead of removed `toOrderResponse`; corrected cancel error message). `knowledge_base.json` was moved into `src/` to satisfy `tsconfig.json` `rootDir: "src"` constraints. Final result: 169 unit tests, 2 E2E tests, 100% statement/function/line coverage, clean build/lint/prettier.
+
+### 9. Mock Type Inference Collapse in Jest
+
+**Prompt:**
+> "Fix TypeScript errors in ai-agent.service.spec.ts where mock return types are inferred as `never`."
+
+**Outcome:** The original test used a `mockState` object pattern where `jest.fn()` was called without type parameters. When conflicting `.mockReturnValue()` calls were chained (e.g., `jest.fn().mockReturnValue(true).mockReturnValue(false)`), TypeScript inferred the return type as `never`, which then propagated to every method call on the mock. The fix replaced the pattern with `jest.MockedObjectDeep<T>` and explicit `.mockResolvedValue()` per test, eliminating the type collapse entirely.
+
+### 10. Prisma Type Mapping for Query Results
+
+**Prompt:**
+> "The `getLogs` method returns Prisma `AILog` objects but the interface `AILogEntry` doesn't include Prisma fields. Fix the type mismatch without using `any`."
+
+**Outcome:** Instead of returning raw Prisma results, `getLogs` now explicitly maps each field: `log.rawInput ?? undefined` became `log.rawInput` (typed as `string | null` in both Prisma and `AILogEntry`). The `where` clause was typed as `{ intent?: AILogEntry["intent"]; promptInjectionDetected?: boolean }` instead of `Record<string, unknown>`. Intent and toolCalled fields use explicit `as AILogEntry["intent"]` casts to bridge Prisma's string type with the enum-like interface.
+
 ## Technical Failures & Hallucinations
 
 ### Failure 1: LLM Suggesting Unsafe Cancellation Pattern
